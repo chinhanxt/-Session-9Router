@@ -1,4 +1,4 @@
-# 🚀 Trình Quản Lý & Chuyển Đổi Session 9Router Professional
+# 🚀 Trình Quản Lý & Chuyển Đổi Session 9Router
 
 <div align="center">
 
@@ -8,117 +8,67 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4.x-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![LocalStorage](https://img.shields.io/badge/Storage-LocalStorage-purple?style=for-the-badge&logo=git&logoColor=white)](#)
 
-**Giải pháp chuyên nghiệp, an toàn và trực quan giúp quản lý, chuyển đổi ChatGPT Auth Session thành Codex Connection và gộp file sao lưu tự động cho 9Router.**
-
-[Tính Năng Nổi Bật](#-tính-năng-nổi-bật) • [Hình Ảnh Minh Họa](#-hình-ảnh-minh-họa) • [Hướng Dẫn Sử Dụng](#-hướng-dẫn-sử-dụng) • [Cài Đặt Cục Bộ](#-cài-đặt-cục-bộ-local-development) • [An Toàn & Bảo Mật](#-an-toàn--bảo-mật)
+**Bộ công cụ chuyển đổi nhanh ChatGPT Auth Session sang Codex Connection và tự động gộp/quản lý danh sách tài khoản 9Router an toàn, không lo ghi đè mất dữ liệu.**
 
 </div>
 
 ---
 
-## 📖 Giới Thiệu
+## ✨ Điểm Nổi Bật 
 
-**9Router** là một cổng định tuyến đa tài khoản mạnh mẽ. Để sử dụng tài khoản ChatGPT của bạn trên 9Router dưới dạng kết nối Codex, bạn cần chuyển đổi dữ liệu Session JSON của trình duyệt sang cấu trúc chính xác mà 9Router yêu cầu.
-
-Tuy nhiên, một điểm bất tiện lớn của 9Router là khi bạn **nhập bản sao lưu mới**, nó sẽ **ghi đè và làm mất sạch các tài khoản đã nhập trước đó**. 
-
-**9Router Session Converter & Manager** ra đời để giải quyết triệt để vấn đề này. Ứng dụng không chỉ chuyển đổi session sang định dạng Codex chuẩn mà còn tích hợp một **Thư viện Quản lý Tài khoản Cục bộ (LocalStorage)** mạnh mẽ, cho phép gộp tài khoản tự động từ file backup cũ, điều chỉnh độ ưu tiên, trạng thái hoạt động và xuất ra một file sao lưu duy nhất chứa đầy đủ tất cả tài khoản.
-
----
-
-## 🎨 Hình Ảnh Minh Họa
-
-Dưới đây là một số hình ảnh thực tế về giao diện trắng - tím sang trọng và các tính năng đột phá của ứng dụng:
-
-### 🌟 1. Tổng Quan Giao Diện Trắng - Tím Premium
-Giao diện được thiết kế hiện đại, cân đối, bo góc mềm mại với hiệu ứng chuyển động mượt mà và trực quan.
-![Giao diện tổng quan](./docs/images/screenshot_full.png)
-
-### 🔄 2. Chuyển Đổi & Phân Tích Thông Tin Tài Khoản
-Sau khi dán JSON Session, hệ thống tự động phân tích ảnh đại diện, tên, email, gói tài khoản (Plus/Free) và hiển thị trực quan.
-![Phân tích hồ sơ tài khoản](./docs/images/screenshot_profile.png)
-
-### 💻 3. Khung Code Tô Màu Cú Pháp (IDE-Style)
-JSON đầu ra được tự động định dạng và tô màu cú pháp (chuỗi, số, boolean, null) chuyên nghiệp giống như một IDE thu nhỏ.
-![Khung hiển thị mã JSON](./docs/images/screenshot_code.png)
-
-### 📦 4. Thư Viện Tài Khoản & Gộp File Backup Thông Minh
-Quản lý tập trung tất cả tài khoản của bạn. Hỗ trợ nhập file backup cũ để tự động gộp mà không lo bị đè mất dữ liệu.
-![Quản lý thư viện tài khoản](./docs/images/screenshot_merge.png)
+* **🔄 Chuyển đổi siêu tốc:** Định dạng dữ liệu ChatGPT Session sang Codex Connection chỉ với 1 click.
+* **💾 Thư viện LocalStorage:** Tự động lưu giữ danh sách tài khoản ngay trên trình duyệt, không mất khi reload trang (F5).
+* **➕ Gộp Backup thông minh:** Nạp file backup cũ để tự động gộp thêm tài khoản mới vào danh sách, khắc phục hoàn toàn lỗi ghi đè của 9Router.
+* **⚡ Nút Lấy Session nhanh:** Mở nhanh đường dẫn API OpenAI để lấy mã JSON session tức thì.
+* **🎨 Giao diện Trắng - Tím Premium:** Thiết kế HSL trực quan, bo góc mềm mại, hiển thị hồ sơ avatar và tô màu cú pháp JSON chuyên nghiệp.
+* **🔒 Bảo mật tuyệt đối:** Xử lý 100% Client-side cục bộ trong trình duyệt, không gửi dữ liệu đi bất kỳ đâu.
 
 ---
 
-## ✨ Tính Năng Nổi Bật
+## 🎯 Hướng Dẫn Sử Dụng Nhanh
 
-- **🔄 Chuyển đổi session trong 1 nốt nhạc:** Phân tích cú pháp ChatGPT Auth Session phức tạp và chuyển đổi sang định dạng Codex chuẩn của 9Router trong tích tắc.
-- **⚡ Nút Lấy ChatGPT Session tiện lợi:** Tích hợp liên kết mở nhanh trang API session của OpenAI giúp bạn sao chép nhanh JSON session chỉ với 1 click.
-- **💾 Thư viện lưu trữ cục bộ (LocalStorage):** Đồng bộ tự động danh sách tài khoản của bạn trên trình duyệt web, đảm bảo không bị mất dữ liệu khi tải lại trang (F5).
-- **➕ Cơ chế Gộp Backup thông minh:** Tải lên file backup cũ của bạn, hệ thống sẽ tự động gộp tất cả tài khoản cũ vào thư viện, tự động cập nhật token mới cho tài khoản trùng email.
-- **🛠️ Chỉnh sửa nhanh trực quan:** Thay đổi **Độ ưu tiên (Priority)** từ 1 đến 5 hoặc bật/tắt **Trạng thái hoạt động (Active)** trực tiếp trên từng thẻ tài khoản trong thư viện.
-- **📤 Xuất file sao lưu hợp nhất một chạm:** Xuất toàn bộ danh sách tài khoản đang quản lý thành một file sao lưu `.json` duy nhất để nạp vào 9Router một lần duy nhất.
-- **🔔 Thông báo Toast mượt mà:** Tích hợp hệ thống thông báo trạng thái nổi (success, info, error) với hiệu ứng trượt góc phải chuyên nghiệp.
-- **🔒 Bảo mật tuyệt đối 100%:** Toàn bộ quá trình xử lý, lưu trữ đều diễn ra cục bộ trong trình duyệt của bạn (Client-side). Không gửi bất kỳ dữ liệu nào lên server.
+> [!IMPORTANT]
+> **BƯỚC 1: LẤY SESSION**
+> * Đăng nhập ChatGPT trên trình duyệt.
+> * Bấm nút **"Lấy ChatGPT Session"** ở góc trái khung nhập liệu để mở nhanh trang API OpenAI.
+> * Sao chép toàn bộ nội dung JSON hiển thị tại đó.
 
----
+> [!TIP]
+> **BƯỚC 2: CHUYỂN ĐỔI & LƯU TRỮ**
+> * Dán JSON vào ô **"JSON Session ChatGPT"** và nhấn **"Bắt đầu chuyển đổi"**.
+> * Bấm nút **"Lưu Vào Danh Sách"** (Màu xanh lá) để thêm tài khoản vào Thư viện quản lý phía dưới.
 
-## 🚀 Hướng Dẫn Sử Dụng
-
-### Bước 1: Lấy dữ liệu ChatGPT Session JSON
-Đăng nhập tài khoản ChatGPT của bạn trên trình duyệt, sau đó nhấn nút **"Lấy ChatGPT Session"** ở phía trên cùng bên trái khung nhập liệu để mở nhanh trang session của OpenAI. Bôi đen và sao chép toàn bộ nội dung JSON hiển thị tại đó.
-
-### Bước 2: Chuyển đổi tài khoản
-Dán nội dung JSON session vào ô **"JSON Session ChatGPT"** bên trái và nhấn nút **"Bắt đầu chuyển đổi"** ở giữa.
-
-### Bước 3: Lưu vào thư viện quản lý
-* Nhấn nút **"Lưu Vào Danh Sách"** (màu xanh lá) ở trên khung kết quả để lưu tài khoản vào Thư viện phía dưới trình duyệt.
-* *(Tùy chọn)* Nếu muốn tải riêng file backup chỉ chứa duy nhất tài khoản này, bạn có thể nhấn nút **"Tải File Riêng Lẻ"** (màu tím).
-
-### Bước 4: Nhập và Gộp tài khoản cũ (Tùy chọn)
-Nếu bạn có một file sao lưu cũ từ 9Router chứa các tài khoản đang hoạt động, hãy nhấn nút **"Nhập File Backup Cũ"** tại khu vực Thư viện để nạp toàn bộ các tài khoản cũ đó vào danh sách quản lý.
-
-### Bước 5: Xuất file sao lưu cuối cùng
-Kiểm tra danh sách tài khoản tại Thư viện phía dưới, tinh chỉnh độ ưu tiên nếu muốn, sau đó nhấn **"Xuất File Sao Lưu Toàn Bộ"** để tải về file cấu hình gộp cuối cùng. Nạp file này vào 9Router của bạn để kích hoạt toàn bộ tài khoản cùng một lúc!
+> [!WARNING]
+> **BƯỚC 3: GỘP TÀI KHOẢN CŨ & XUẤT FILE**
+> * Tại khu vực Thư viện, bấm **"Nhập File Backup Cũ"** và chọn file backup sẵn có của bạn để tự động gộp chung danh sách.
+> * Điều chỉnh **Độ ưu tiên (Priority)** hoặc trạng thái tài khoản trực quan nếu cần.
+> * Bấm **"Xuất File Sao Lưu Toàn Bộ"** để tải về file cấu hình `.json` duy nhất chứa đầy đủ tất cả tài khoản.
+> * Nạp file này vào trang quản trị 9Router của bạn một lần duy nhất là hoàn tất!
 
 ---
 
-## 🛠️ Cài Đặt Cục Bộ (Local Development)
+## 🛠️ Cài Đặt Cục Bộ
 
-Yêu cầu máy tính của bạn đã cài đặt [Node.js](https://nodejs.org/) (khuyên dùng phiên bản v18 trở lên).
+Yêu cầu máy tính đã cài đặt [Node.js](https://nodejs.org/).
 
-### 1. Tải mã nguồn về máy
 ```bash
+# 1. Tải mã nguồn
 git clone https://github.com/chinhanxt/-Session-9Router.git
 cd -Session-9Router
-```
 
-### 2. Cài đặt các thư viện phụ thuộc
-```bash
+# 2. Cài đặt thư viện
 npm install
-```
 
-### 3. Khởi chạy máy chủ phát triển (Development Server)
-```bash
+# 3. Chạy môi trường phát triển (Mở http://localhost:5173/)
 npm run dev
-```
-Ứng dụng sẽ chạy tại địa chỉ: [http://localhost:5173/](http://localhost:5173/)
 
-### 4. Biên dịch cho môi trường Production
-```bash
+# 4. Biên dịch Production
 npm run build
 ```
-Lệnh này sẽ tối ưu hóa và xuất mã nguồn sạch ra thư mục `dist` để sẵn sàng triển khai lên Github Pages hoặc bất kỳ hosting tĩnh nào.
 
 ---
 
-## 🔒 An Toàn & Bảo Mật
+## 🔒 Giấy Phép & Bảo Mật
 
-Bảo mật thông tin khóa truy cập của bạn là ưu tiên hàng đầu của chúng tôi:
-* **Xử lý phía Client-side 100%:** Mọi hoạt động phân tích cú pháp, sinh mã UUID ngẫu nhiên, gộp dữ liệu sao lưu đều chạy trực tiếp trên RAM trình duyệt của bạn.
-* **Không giao tiếp bên ngoài:** Trang web hoàn toàn không có API kết nối cơ sở dữ liệu từ xa hay gửi dữ liệu của bạn đi bất cứ đâu. Dữ liệu của bạn thuộc về bạn.
-* **Mã nguồn mở hoàn toàn:** Bạn có thể tự kiểm chứng mức độ an toàn bằng cách đọc mã nguồn chính tại tệp `src/App.tsx`.
-
----
-
-## 📄 Giấy Phép (License)
-
-Dự án này được cấp phép theo các điều khoản của [MIT License](LICENSE). Bạn hoàn toàn có quyền sử dụng, sửa đổi và phân phối lại mã nguồn này một cách tự do.
+* **An toàn 100%:** Dữ liệu hoàn toàn chạy offline trên trình duyệt của bạn.
+* **Mã nguồn mở:** Được cấp phép theo chuẩn [MIT License](LICENSE).
