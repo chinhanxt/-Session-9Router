@@ -1,167 +1,20 @@
-import { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { 
   ArrowRight, AlertCircle, RefreshCw, FileJson, Zap, Download, 
-  ExternalLink, Key, Settings, User, Calendar, ShieldCheck, Edit3, Plus,
-  Check, Trash2, Save, FileDown, FolderOpen, ShieldAlert, List, Info
+  ExternalLink, Key, Plus, Check, Info
 } from 'lucide-react';
 
-// ============================================================================
-// ĐỊNH NGHĨA PHÂN LOẠI DỮ LIỆU & HÀM BỔ TRỢ
-// ============================================================================
+// Import Types
+import { ChatGPTSession, CodexConnection, ParsedProfile } from './types/connection';
 
-interface ChatGPTSession {
-  user?: {
-    id?: string;
-    name?: string;
-    email?: string;
-    picture?: string;
-  };
-  account?: {
-    id?: string;
-    planType?: string;
-  };
-  accessToken?: string;
-  sessionToken?: string;
-  expires?: string;
-}
+// Import Helpers
+import { convertSessionToCodex } from './utils/helpers';
 
-interface CodexConnection {
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: string;
-  testStatus: string;
-  expiresIn: number;
-  providerSpecificData: {
-    chatgptAccountId: string;
-    chatgptPlanType: string;
-  };
-  id: string;
-  provider: string;
-  authType: string;
-  name: string;
-  email: string;
-  priority: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface ParsedProfile {
-  name: string;
-  email: string;
-  avatar: string;
-  plan: string;
-  expires: string;
-}
-
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-function convertSessionToCodex(session: ChatGPTSession, priority: number = 1): CodexConnection {
-  const now = new Date();
-  const expiresIn = 864000; // 10 ngày tính bằng giây
-  const expiresAt = new Date(now.getTime() + expiresIn * 1000);
-
-  return {
-    accessToken: session.accessToken || '',
-    refreshToken: session.sessionToken || '',
-    expiresAt: expiresAt.toISOString(),
-    testStatus: 'active',
-    expiresIn,
-    providerSpecificData: {
-      chatgptAccountId: session.account?.id || '',
-      chatgptPlanType: session.account?.planType || 'plus',
-    },
-    id: generateUUID(),
-    provider: 'codex',
-    authType: 'oauth',
-    name: session.user?.email || '',
-    email: session.user?.email || '',
-    priority,
-    isActive: true,
-    createdAt: now.toISOString(),
-    updatedAt: now.toISOString(),
-  };
-}
-
-// Định dạng thời gian thân thiện bằng tiếng Việt
-function formatVietnameseDate(dateStr: string): string {
-  if (!dateStr) return 'Không rõ hạn';
-  try {
-    const date = new Date(dateStr);
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${hours}:${minutes} - ngày ${day}/${month}/${year}`;
-  } catch {
-    return dateStr;
-  }
-}
-
-// ============================================================================
-// BỘ HIỂN THỊ CÚ PHÁP JSON ĐẸP MẮT
-// ============================================================================
-
-function HighlightedJson({ json }: { json: string }) {
-  if (!json) return null;
-  
-  const lines = json.split('\n');
-  return (
-    <pre className="text-[11px] font-mono select-text leading-relaxed p-1">
-      {lines.map((line, i) => {
-        // Tìm kiếm các cặp key: value
-        const keyMatch = line.match(/^(\s*)"([^"]+)":/);
-        if (keyMatch) {
-          const indent = keyMatch[1];
-          const key = keyMatch[2];
-          const rest = line.substring(keyMatch[0].length);
-          
-          // Định dạng màu sắc dựa trên kiểu dữ liệu của value
-          let valueSpan = <span className="text-slate-700">{rest}</span>;
-          if (rest.includes('"')) {
-            // Chuỗi ký tự (Màu xanh lá nhẹ)
-            valueSpan = <span className="text-emerald-600 font-medium">{rest}</span>;
-          } else if (rest.includes('true') || rest.includes('false')) {
-            // Boolean (Màu hồng đào)
-            valueSpan = <span className="text-rose-500 font-semibold">{rest}</span>;
-          } else if (rest.match(/\d+/)) {
-            // Số (Màu chàm)
-            valueSpan = <span className="text-indigo-500 font-semibold">{rest}</span>;
-          } else if (rest.includes('null')) {
-            // Null (Màu xám nhạt)
-            valueSpan = <span className="text-slate-400 italic">{rest}</span>;
-          }
-          
-          return (
-            <div key={i} className="hover:bg-purple-50/60 px-1 rounded transition-colors">
-              <span className="text-slate-350">{indent}</span>
-              <span className="text-purple-600 font-semibold">"{key}"</span>
-              <span className="text-slate-400">:</span>
-              {valueSpan}
-            </div>
-          );
-        }
-        
-        return (
-          <div key={i} className="hover:bg-purple-50/60 px-1 rounded transition-colors text-slate-400">
-            {line}
-          </div>
-        );
-      })}
-    </pre>
-  );
-}
-
-// ============================================================================
-// THÀNH PHẦN CHÍNH GIAO DIỆN
-// ============================================================================
+// Import Components
+import { HighlightedJson } from './components/HighlightedJson';
+import { ProfileCard } from './components/ProfileCard';
+import { LibraryManager } from './components/LibraryManager';
+import { Instructions } from './components/Instructions';
 
 function App() {
   const [sessionInput, setSessionInput] = useState('');
@@ -500,7 +353,7 @@ function App() {
         }`}>
           {toastMessage.type === 'success' && <Check className="w-4 h-4 text-emerald-650 shrink-0" />}
           {toastMessage.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />}
-          {toastMessage.type === 'info' && <Info className="w-4 h-4 text-purple-650 shrink-0" />}
+          {toastMessage.type === 'info' && <Info className="w-4 h-4 text-purple-655 shrink-0" />}
           <span className="text-[11px] font-bold">{toastMessage.text}</span>
         </div>
       )}
@@ -570,58 +423,9 @@ function App() {
               </div>
             </div>
             
-            {/* Nội dung bên trái: Hiện Textarea HOẶC Card Profile cực kỳ đẹp */}
+            {/* Nội dung bên trái: Hiện Textarea HOẶC Card Profile */}
             {parsedProfile ? (
-              <div className="p-6 flex-grow flex flex-col justify-center items-center space-y-6 bg-gradient-to-b from-purple-50/20 to-white animate-fade-in">
-                
-                {/* Ảnh đại diện người dùng */}
-                <div className="relative group">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-full blur-md opacity-20 group-hover:opacity-40 transition-opacity" />
-                  {parsedProfile.avatar ? (
-                    <img 
-                      src={parsedProfile.avatar} 
-                      alt="Avatar" 
-                      className="w-16 h-16 rounded-full border-2 border-purple-200 relative z-10 object-cover shadow-inner"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 rounded-full border-2 border-purple-200 bg-purple-50 flex items-center justify-center relative z-10">
-                      <Zap className="w-6 h-6 text-purple-400" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Tên & Email */}
-                <div className="text-center space-y-1">
-                  <h3 className="text-base font-extrabold text-purple-950">{parsedProfile.name}</h3>
-                  <p className="text-xs text-slate-500 font-light">{parsedProfile.email}</p>
-                </div>
-
-                {/* Phân loại tài khoản (Huy hiệu lấp lánh) */}
-                <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold shadow-sm uppercase tracking-wider ${
-                    parsedProfile.plan.toLowerCase() === 'plus' 
-                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-purple-500/10' 
-                      : 'bg-purple-100 text-purple-700'
-                  }`}>
-                    Gói ChatGPT {parsedProfile.plan.toUpperCase()}
-                  </span>
-                </div>
-
-                {/* Thời gian hết hạn */}
-                <div className="w-full bg-slate-50/80 border border-slate-100 rounded-2xl p-4 flex items-center gap-3 text-left">
-                  <div className="w-8 h-8 rounded-lg bg-purple-100 border border-purple-200 flex items-center justify-center shrink-0">
-                    <Zap className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hết hạn Session (Dự kiến)</p>
-                    <p className="text-xs text-slate-700 font-semibold mt-0.5">
-                      {formatVietnameseDate(parsedProfile.expires)}
-                    </p>
-                  </div>
-                </div>
-
-              </div>
+              <ProfileCard parsedProfile={parsedProfile} />
             ) : (
               <textarea
                 value={sessionInput}
@@ -675,7 +479,6 @@ function App() {
                 </div>
               ) : converterOutput ? (
                 <div className="animate-fade-in">
-                  {/* Render JSON tô màu cú pháp chuyên nghiệp */}
                   <HighlightedJson json={converterOutput} />
                 </div>
               ) : (
@@ -702,211 +505,37 @@ function App() {
           </button>
         </div>
 
-        {/* ============================================================================ */}
-        {/* KHU VỰC QUẢN LÝ THƯ VIỆN TÀI KHOẢN (LOCAL STORAGE MANAGER) */}
-        {/* ============================================================================ */}
-        <div className="bg-white border border-purple-100 rounded-2xl shadow-sm hover:border-purple-200/60 hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col animate-fade-in">
-          {/* Header Thư Viện */}
-          <div className="bg-purple-50/20 border-b border-purple-100/50 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-lg bg-purple-100 border border-purple-200 flex items-center justify-center shadow-inner">
-                <List className="w-4.5 h-4.5 text-purple-600" />
-              </div>
-              <div>
-                <h2 className="text-sm font-extrabold text-purple-950 uppercase tracking-wider">
-                  Thư Viện Tài Khoản Đang Quản Lý ({savedConnections.length})
-                </h2>
-                <p className="text-[10px] text-slate-400 font-light mt-0.5">
-                  Đồng bộ an toàn trên bộ nhớ trình duyệt. Hỗ trợ chỉnh sửa và gộp tự động.
-                </p>
-              </div>
-            </div>
+        {/* KHU VỰC QUẢN LÝ THƯ VIỆN TÀI KHOẢN */}
+        <LibraryManager 
+          savedConnections={savedConnections}
+          handleBackupUpload={handleBackupUpload}
+          handleExportAll={handleExportAll}
+          handleClearAll={handleClearAll}
+          handleUpdatePriority={handleUpdatePriority}
+          handleToggleActive={handleToggleActive}
+          handleDeleteConnection={handleDeleteConnection}
+        />
 
-            {/* Các hành động chính */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Nút Nhập Backup Cũ */}
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleBackupUpload}
-                className="hidden"
-                id="library-backup-upload"
-              />
-              <label 
-                htmlFor="library-backup-upload" 
-                className="text-[10px] text-purple-750 hover:text-purple-950 bg-purple-50 hover:bg-purple-100 border border-purple-200/60 px-3.5 py-2 rounded-xl transition-all shadow-sm font-bold cursor-pointer flex items-center gap-1.5"
-                title="Tải lên file backup cũ của bạn để gộp thêm các tài khoản vào danh sách quản lý hiện tại"
-              >
-                <FolderOpen className="w-3.5 h-3.5 text-purple-650" />
-                Nhập File Backup Cũ
-              </label>
-
-              {/* Nút Xuất File Backup Hợp Nhất */}
-              {savedConnections.length > 0 && (
-                <>
-                  <button
-                    onClick={handleExportAll}
-                    className="text-[10px] text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 border-none px-3.5 py-2 rounded-xl transition-all shadow-md shadow-purple-500/10 font-bold flex items-center gap-1.5"
-                    title="Xuất một file sao lưu 9Router duy nhất chứa toàn bộ các tài khoản trong danh sách"
-                  >
-                    <FileDown className="w-3.5 h-3.5" />
-                    Xuất File Sao Lưu Toàn Bộ ({savedConnections.length} TK)
-                  </button>
-
-                  {/* Nút Xóa Sạch */}
-                  <button
-                    onClick={handleClearAll}
-                    className="text-[10px] text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200/60 px-3.5 py-2 rounded-xl transition-all shadow-sm font-bold flex items-center gap-1.5"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-550" />
-                    Xóa Sạch Thư Viện
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Nội Dung Thư Viện */}
-          <div className="p-6 bg-slate-50/30">
-            {savedConnections.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 px-4 text-center space-y-3">
-                <div className="w-12 h-12 rounded-full bg-purple-50 border border-purple-100 flex items-center justify-center shadow-inner">
-                  <ShieldAlert className="w-6 h-6 text-purple-400 stroke-[1.2]" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-bold text-slate-500">Thư viện của bạn đang trống</p>
-                  <p className="text-[10px] text-slate-400 font-light max-w-sm leading-relaxed">
-                    Hãy dán session ChatGPT ở trên và nhấn <strong className="text-purple-600">"Lưu Vào Danh Sách"</strong>, hoặc click <strong className="text-purple-650">"Nhập File Backup Cũ"</strong> để tải lên toàn bộ tài khoản cũ đã có.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {savedConnections.map((conn) => (
-                  <div 
-                    key={conn.id} 
-                    className={`bg-white border rounded-2xl p-4 flex flex-col justify-between space-y-3.5 shadow-sm hover:shadow-md transition-all duration-300 relative group ${
-                      conn.isActive 
-                        ? 'border-purple-100 hover:border-purple-200/60' 
-                        : 'border-slate-200 bg-slate-100/20 opacity-75 hover:opacity-100'
-                    }`}
-                  >
-                    {/* Hộp điều khiển xóa ở góc */}
-                    <button
-                      onClick={() => handleDeleteConnection(conn.id, conn.email)}
-                      className="absolute top-3 right-3 text-slate-350 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors"
-                      title="Xóa tài khoản này khỏi danh sách"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Dữ liệu tài khoản */}
-                    <div className="flex items-start gap-2.5 pr-6">
-                      <div className="w-8.5 h-8.5 rounded-full bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0 shadow-inner">
-                        <User className="w-4.5 h-4.5 text-purple-500" />
-                      </div>
-                      <div className="overflow-hidden min-w-0">
-                        <h3 className="text-xs font-extrabold text-purple-950 truncate" title={conn.email}>
-                          {conn.email}
-                        </h3>
-                        <p className="text-[9px] text-slate-400 font-mono mt-0.5 truncate select-all">
-                          ID: {conn.id.substring(0, 8)}...
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Phân loại gói */}
-                    <div className="flex items-center gap-1.5">
-                      <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-wider uppercase ${
-                        conn.providerSpecificData?.chatgptPlanType?.toLowerCase() === 'plus'
-                          ? 'bg-purple-100 text-purple-700 border border-purple-200/40'
-                          : 'bg-slate-100 text-slate-650 border border-slate-200'
-                      }`}>
-                        ChatGPT {conn.providerSpecificData?.chatgptPlanType?.toUpperCase() || 'FREE'}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-wider uppercase ${
-                        conn.isActive
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-250/30'
-                          : 'bg-rose-50 text-rose-700 border border-rose-250/30'
-                      }`}>
-                        {conn.isActive ? 'Hoạt động' : 'Tạm dừng'}
-                      </span>
-                    </div>
-
-                    {/* Dòng điều khiển: Độ ưu tiên & Kích hoạt */}
-                    <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-3">
-                      {/* Trình chọn độ ưu tiên */}
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] text-slate-400 font-bold">Ưu tiên:</span>
-                        <select
-                          value={conn.priority || 1}
-                          onChange={(e) => handleUpdatePriority(conn.id, parseInt(e.target.value))}
-                          className="text-[10px] font-bold text-slate-650 border border-slate-200 rounded-lg px-1.5 py-0.5 bg-white focus:outline-none focus:border-purple-300"
-                        >
-                          <option value={1}>1 (Mặc định)</option>
-                          <option value={2}>2</option>
-                          <option value={3}>3</option>
-                          <option value={4}>4</option>
-                          <option value={5}>5 (Cao nhất)</option>
-                        </select>
-                      </div>
-
-                      {/* Nút bật/tắt hoạt động */}
-                      <button
-                        onClick={() => handleToggleActive(conn.id)}
-                        className={`text-[9px] font-bold px-2.5 py-1 rounded-lg border transition-all ${
-                          conn.isActive
-                            ? 'text-emerald-700 hover:text-emerald-800 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
-                            : 'text-slate-500 hover:text-slate-700 bg-slate-100 border-slate-200 hover:bg-slate-205'
-                        }`}
-                      >
-                        {conn.isActive ? 'Tạm dừng' : 'Kích hoạt'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Bảng Hướng Dẫn Từng Bước */}
-        <div className="bg-purple-50/40 border border-purple-100/60 rounded-2xl p-6 space-y-4 shadow-sm animate-fade-in">
-          <h4 className="text-sm font-extrabold text-purple-950 flex items-center gap-2">
-            <Settings className="w-4 h-4 text-purple-600" />
-            Hướng dẫn lấy Session & quản lý gộp nhiều tài khoản 9Router:
-          </h4>
-          <ol className="text-xs text-slate-650 space-y-3.5 list-decimal list-inside font-light leading-relaxed font-outfit">
-            <li>
-              Đăng nhập tài khoản ChatGPT của bạn trên trình duyệt, sau đó nhấn nút 
-              <strong className="text-purple-750 ml-1">"Lấy ChatGPT Session"</strong> ở phía trên để mở nhanh trang session của OpenAI.
-            </li>
-            <li>Sao chép toàn bộ nội dung JSON hiển thị tại trang đó và dán vào ô bên trái **"JSON Session ChatGPT"**.</li>
-            <li>
-              Nhấn nút **"Bắt đầu chuyển đổi"** ở bên dưới.
-            </li>
-            <li>
-              Nhấn nút **"Lưu Vào Danh Sách"** vừa xuất hiện ở góc trên khung kết quả để lưu tài khoản vào Thư viện. Bạn có thể lặp lại các bước trên nhiều lần để thêm nhiều tài khoản khác nhau!
-            </li>
-            <li>
-              <span className="text-purple-750 font-bold">*(Tùy chọn)*</span> Nếu muốn gộp nhanh các tài khoản cũ đã có trên 9Router, hãy nhấn **"Nhập File Backup Cũ"** ở khu vực Thư viện phía dưới và tải lên file backup cũ của bạn.
-            </li>
-            <li>
-              Tại Thư viện, bạn có thể chỉnh sửa nhanh **Độ ưu tiên (Priority)**, tạm dừng/kích hoạt hoặc xóa tài khoản.
-            </li>
-            <li>
-              Cuối cùng, nhấn **"Xuất File Sao Lưu Toàn Bộ"** ở khu vực Thư viện để tải về một file sao lưu JSON duy nhất chứa toàn bộ các tài khoản đang quản lý.
-            </li>
-            <li>Truy cập vào trang quản trị 9Router của bạn, click chọn nút **"Nhập bản sao lưu"** và tải lên file vừa tải về là hoàn tất!</li>
-          </ol>
-        </div>
+        {/* BẢNG HƯỚNG DẪN TỪNG BƯỚC */}
+        <Instructions />
 
       </div>
 
       {/* Phần Chân Trang */}
-      <footer className="border-t border-slate-200/50 py-6 bg-slate-50 text-center relative z-10 mt-auto">
-        <p className="text-[10px] sm:text-xs text-slate-455 font-light flex items-center justify-center">
+      <footer className="border-t border-slate-200/50 py-6 bg-slate-50 text-center relative z-10 mt-auto flex flex-col items-center justify-center gap-1.5">
+        <p className="text-[10px] sm:text-xs text-slate-455 font-light">
           Dữ liệu được bảo mật và lưu trữ 100% cục bộ trên trình duyệt của bạn (Client-side).
+        </p>
+        <p className="text-[10px] sm:text-xs text-slate-400 font-light flex items-center gap-1 justify-center">
+          <span>Phát triển bởi</span>
+          <a 
+            href="https://github.com/chinhanxt" 
+            target="_blank" 
+            rel="noreferrer" 
+            className="text-purple-650 hover:text-purple-800 font-bold flex items-center gap-0.5 transition-colors"
+          >
+            chinhanxt <ExternalLink className="w-3 h-3" />
+          </a>
         </p>
       </footer>
 
