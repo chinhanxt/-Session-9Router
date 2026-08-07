@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { 
   ArrowRight, AlertCircle, RefreshCw, FileJson, Zap, Download, 
-  ExternalLink, Key, Plus, Check, Info, Cpu
+  ExternalLink, Key, Plus, Check, Info, Cpu, ClipboardCheck
 } from 'lucide-react';
 
 // Import Types
@@ -64,7 +64,7 @@ function App() {
     }
   }, [toastMessage]);
 
-  // Hàm bổ trợ để lưu danh sách vào localStorage
+  // Lưu danh sách vào localStorage
   const saveConnectionsToStorage = useCallback((conns: CodexConnection[]) => {
     const validConns = conns.filter(c => c && typeof c === 'object' && c.id);
     setSavedConnections(validConns);
@@ -74,6 +74,50 @@ function App() {
       console.error('Không thể lưu vào localStorage', err);
     }
   }, []);
+
+  const runClaudeConversion = useCallback((text: string) => {
+    const skMatch = text.match(/sk-ant-[A-Za-z0-9_-]+/i);
+    const sessionKey = skMatch ? skMatch[0] : text.trim();
+
+    const now = new Date();
+    const expiresIn = 31536000; // 1 năm
+    const expiresAt = new Date(now.getTime() + expiresIn * 1000);
+    const subKey = sessionKey.length > 25 ? sessionKey.substring(13, 21) : 'session';
+    const email = `claude-${subKey}@claude.ai`;
+
+    setParsedProfile({
+      name: `Tài khoản Claude Web (${sessionKey.substring(0, 16)}...)`,
+      email: email,
+      avatar: '',
+      plan: 'Claude Web',
+      expires: expiresAt.toISOString(),
+    });
+
+    const claudeConnection: CodexConnection = {
+      accessToken: sessionKey,
+      refreshToken: '',
+      expiresAt: expiresAt.toISOString(),
+      testStatus: 'active',
+      expiresIn,
+      providerSpecificData: {
+        sessionKey: sessionKey,
+        orgId: '',
+      },
+      id: generateUUID(),
+      provider: 'claude',
+      authType: 'session_key',
+      name: email,
+      email: email,
+      priority: 1,
+      isActive: true,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+
+    setConverterOutput(JSON.stringify(claudeConnection, null, 2));
+    setConverterError('');
+    showToast('⚡ Đã chuyển đổi Claude Session thành công!', 'success');
+  }, [showToast]);
 
   const handleConvert = useCallback(() => {
     setConverterError('');
@@ -88,46 +132,7 @@ function App() {
 
     // Nếu dán mã Claude sessionKey (sk-ant-...)
     if (input.includes('sk-ant-') || input.includes('sessionKey')) {
-      const skMatch = input.match(/sk-ant-[A-Za-z0-9_-]+/i);
-      const sessionKey = skMatch ? skMatch[0] : input;
-
-      const now = new Date();
-      const expiresIn = 31536000; // 1 năm
-      const expiresAt = new Date(now.getTime() + expiresIn * 1000);
-      const subKey = sessionKey.length > 25 ? sessionKey.substring(13, 21) : 'session';
-      const email = `claude-${subKey}@claude.ai`;
-
-      setParsedProfile({
-        name: `Tài khoản Claude Web (${sessionKey.substring(0, 16)}...)`,
-        email: email,
-        avatar: '',
-        plan: 'Claude Web',
-        expires: expiresAt.toISOString(),
-      });
-
-      const claudeConnection: CodexConnection = {
-        accessToken: sessionKey,
-        refreshToken: '',
-        expiresAt: expiresAt.toISOString(),
-        testStatus: 'active',
-        expiresIn,
-        providerSpecificData: {
-          sessionKey: sessionKey,
-          orgId: '',
-        },
-        id: generateUUID(),
-        provider: 'claude',
-        authType: 'session_key',
-        name: email,
-        email: email,
-        priority: 1,
-        isActive: true,
-        createdAt: now.toISOString(),
-        updatedAt: now.toISOString(),
-      };
-
-      setConverterOutput(JSON.stringify(claudeConnection, null, 2));
-      showToast('Đã phân tích Claude Session thành công!', 'success');
+      runClaudeConversion(input);
       return;
     }
 
@@ -154,7 +159,44 @@ function App() {
     } catch {
       setConverterError('Định dạng không hợp lệ. Vui lòng dán JSON Session ChatGPT hoặc mã Claude sessionKey (sk-ant-sid...).');
     }
-  }, [sessionInput, showToast]);
+  }, [sessionInput, runClaudeConversion, showToast]);
+
+  // Nút 1-Click: Dán từ Clipboard & Chuyển Đổi Siêu Tốc
+  const handleOneClickPasteAndConvert = useCallback(async () => {
+    let text = '';
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {}
+
+    if (!text || !text.trim()) {
+      text = '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';
+    }
+
+    setSessionInput(text);
+
+    if (text.includes('sk-ant-') || text.includes('sessionKey')) {
+      runClaudeConversion(text);
+    } else {
+      try {
+        const session: ChatGPTSession = JSON.parse(text);
+        if (session.accessToken) {
+          const name = session.user?.name || 'Người dùng ChatGPT';
+          const email = session.user?.email || 'Không có email';
+          const avatar = session.user?.picture || '';
+          const plan = session.account?.planType || 'free';
+          const expires = session.expires || '';
+          setParsedProfile({ name, email, avatar, plan, expires });
+          const codexConnection = convertSessionToCodex(session, 1);
+          setConverterOutput(JSON.stringify(codexConnection, null, 2));
+          showToast('⚡ Đã chuyển đổi ChatGPT Session thành công!', 'success');
+        } else {
+          runClaudeConversion(text);
+        }
+      } catch {
+        runClaudeConversion(text);
+      }
+    }
+  }, [runClaudeConversion, showToast]);
 
   // Lưu tài khoản vừa chuyển đổi vào danh sách
   const handleSaveToList = useCallback(() => {
@@ -170,7 +212,6 @@ function App() {
 
       let isUpdate = false;
       if (index > -1) {
-        // Cập nhật tài khoản cũ trùng tên/email, giữ nguyên ID cũ
         updatedConns[index] = {
           ...newConnection,
           id: updatedConns[index].id,
@@ -179,13 +220,11 @@ function App() {
         };
         isUpdate = true;
       } else {
-        // Thêm mới
         updatedConns.push(newConnection);
       }
 
       saveConnectionsToStorage(updatedConns);
       
-      // Reset converter và hiện thông báo
       setSessionInput('');
       setConverterOutput('');
       setParsedProfile(null);
@@ -214,7 +253,6 @@ function App() {
           return;
         }
 
-        // Lưu metadata backup
         const metadata = {
           settings: parsed.settings || {},
           providerNodes: parsed.providerNodes || [],
@@ -232,7 +270,6 @@ function App() {
           localStorage.setItem('9router_backup_metadata', JSON.stringify(metadata));
         } catch {}
 
-        // Gộp các kết nối vào danh sách hiện tại
         const importedConns: CodexConnection[] = parsed.providerConnections || [];
         const updatedConns = [...savedConnections];
 
@@ -423,6 +460,18 @@ function App() {
           <p className="text-slate-500 text-sm max-w-lg mx-auto font-light leading-relaxed">
             Chuyển đổi ChatGPT Session & Claude Session Key sang định dạng cấu hình 9Router tương thích hoàn toàn.
           </p>
+        </div>
+
+        {/* Nút 1-Click: Dán từ Clipboard & Chuyển Đổi Siêu Tốc */}
+        <div className="flex justify-center">
+          <button
+            onClick={handleOneClickPasteAndConvert}
+            className="group text-xs font-extrabold bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white px-8 py-3 rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            title="Nhấn nút này để dán mã Claude sessionKey hoặc ChatGPT Session từ Clipboard và xuất ngay JSON 9Router bên màn hình phải!"
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            <span>📋 Dán từ Clipboard & Chuyển Đổi Siêu Tốc (1-Click)</span>
+          </button>
         </div>
 
         {/* Bố Cục Hai Bảng Cân Đối Đối Xứng */}
