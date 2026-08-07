@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { 
   ArrowRight, AlertCircle, RefreshCw, FileJson, Zap, Download, 
-  ExternalLink, Plus, Check, Info, Cpu, ClipboardCheck
+  ExternalLink, Plus, Check, Info, Cpu, ClipboardCheck, Bookmark, Sparkles, Copy
 } from 'lucide-react';
 
 // Import Types
@@ -21,6 +21,7 @@ function App() {
   const [sessionInput, setSessionInput] = useState('');
   const [converterOutput, setConverterOutput] = useState('');
   const [converterError, setConverterError] = useState('');
+  const [showBookmarkGuide, setShowBookmarkGuide] = useState(false);
   
   // Trạng thái lưu thông tin tài khoản đã phân tích từ session
   const [parsedProfile, setParsedProfile] = useState<ParsedProfile | null>(null);
@@ -54,6 +55,84 @@ function App() {
   const showToast = useCallback((text: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToastMessage({ text, type });
   }, []);
+
+  // Tự động nhận diện session từ URL Query
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlClaudeKey = params.get('sessionKey') || params.get('sk');
+    const urlChatGPTJson = params.get('session');
+
+    if (urlClaudeKey) {
+      const decodedKey = decodeURIComponent(urlClaudeKey);
+      setSessionInput(decodedKey);
+      setProviderMode('claude');
+      try {
+        const skMatch = decodedKey.match(/sk-ant-[A-Za-z0-9_-]+/i);
+        const sessionKey = skMatch ? skMatch[0] : decodedKey.trim();
+        const now = new Date();
+        const expiresIn = 31536000;
+        const expiresAt = new Date(now.getTime() + expiresIn * 1000);
+        const subKey = sessionKey.length > 25 ? sessionKey.substring(13, 21) : 'session';
+        const email = `claude-${subKey}@claude.ai`;
+
+        setParsedProfile({
+          provider: 'claude',
+          name: `Tài khoản Claude Web (${sessionKey.substring(0, 16)}...)`,
+          email: email,
+          avatar: '',
+          plan: 'Claude Web',
+          expires: expiresAt.toISOString(),
+        });
+
+        const claudeConnection: CodexConnection = {
+          accessToken: sessionKey,
+          refreshToken: '',
+          expiresAt: expiresAt.toISOString(),
+          testStatus: 'active',
+          expiresIn,
+          providerSpecificData: {
+            sessionKey: sessionKey,
+            orgId: '',
+          },
+          id: generateUUID(),
+          provider: 'claude',
+          authType: 'session_key',
+          name: email,
+          email: email,
+          priority: 1,
+          isActive: true,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+        };
+
+        setConverterOutput(JSON.stringify(claudeConnection, null, 2));
+        showToast('🎉 Đã tự động nhận diện & xuất JSON Claude 9Router từ Nút 1-Click!', 'success');
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch (err: any) {
+        setConverterError(err.message || 'Không thể chuyển đổi key từ URL');
+      }
+    } else if (urlChatGPTJson) {
+      try {
+        const decodedJson = decodeURIComponent(urlChatGPTJson);
+        setSessionInput(decodedJson);
+        setProviderMode('codex');
+        const session: ChatGPTSession = JSON.parse(decodedJson);
+        const name = session.user?.name || session.user?.email || 'Người dùng ChatGPT';
+        const email = session.user?.email || 'chatgpt-user@openai.com';
+        const avatar = session.user?.picture || '';
+        const plan = session.account?.planType || 'free';
+        const expires = session.expires || '';
+
+        setParsedProfile({ provider: 'codex', name, email, avatar, plan, expires });
+        const codexConnection = convertSessionToCodex(session, 1);
+        setConverterOutput(JSON.stringify(codexConnection, null, 2));
+        showToast('🎉 Đã tự động nhận diện & xuất JSON ChatGPT 9Router từ Nút 1-Click!', 'success');
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch {
+        // Quiet catch
+      }
+    }
+  }, [showToast]);
 
   // Tự động tắt toast sau 4 giây
   useEffect(() => {
@@ -130,14 +209,13 @@ function App() {
       const session: ChatGPTSession = JSON.parse(inputJsonStr);
 
       if (!session.accessToken) {
-        setConverterError('Không tìm thấy mã "accessToken" trong dữ liệu JSON ChatGPT. Vui lòng kiểm tra lại.');
+        setConverterError('Không tìm thấy mã "accessToken" trong dữ liệu JSON ChatGPT.');
         return;
       }
 
       const name = session.user?.name || session.user?.email || 'Người dùng ChatGPT';
       const email = session.user?.email || 'chatgpt-user@openai.com';
       const avatar = session.user?.picture || '';
-      // Lấy chính xác gói từ JSON (Free, Plus, Team, Pro), mặc định là Free nếu không có
       const plan = session.account?.planType || 'free';
       const expires = session.expires || '';
 
@@ -148,7 +226,7 @@ function App() {
       setConverterError('');
       showToast(`⚡ Đã chuyển đổi ChatGPT Session (${plan.toUpperCase()}) thành công!`, 'success');
     } catch {
-      setConverterError('Định dạng JSON ChatGPT không hợp lệ. Vui lòng copy chính xác dữ liệu từ chatgpt.com/api/auth/session.');
+      setConverterError('Định dạng JSON ChatGPT không hợp lệ. Vui lòng dán dữ liệu JSON Auth Session từ ChatGPT.');
     }
   }, [showToast]);
 
@@ -174,8 +252,46 @@ function App() {
     }
   }, [sessionInput, providerMode, runClaudeConversion, runChatGPTConversion]);
 
-  // Nút 1-Click Clipboard Đọc Thực Tế (Không tự tạo fake token)
-  const handleOneClickPasteAndConvert = useCallback(async () => {
+  // Nút 1-Click Tự Động Mở Trang & Tự Động Đọc Clipboard
+  const handleAutoOpenAndFetch = useCallback(async () => {
+    setConverterError('');
+    setConverterOutput('');
+    setParsedProfile(null);
+
+    // Mở trang tương ứng trong Tab mới
+    if (providerMode === 'claude') {
+      window.open('https://claude.ai', '_blank');
+      showToast('Đã mở claude.ai! Hãy copy cookie sessionKey rồi quay lại đây.', 'info');
+    } else {
+      window.open('https://chatgpt.com/api/auth/session', '_blank');
+      showToast('Đã mở ChatGPT Session API! Hãy copy mã JSON (Ctrl+A Ctrl+C) rồi quay lại đây.', 'info');
+    }
+
+    // Đọc ngay clipboard nếu đã có mã sẵn
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim()) {
+        const trimmed = text.trim();
+        if (providerMode === 'claude' && trimmed.includes('sk-ant-')) {
+          setSessionInput(trimmed);
+          runClaudeConversion(trimmed);
+          return;
+        } else if (providerMode === 'codex') {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (parsed.accessToken) {
+              setSessionInput(trimmed);
+              runChatGPTConversion(trimmed);
+              return;
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }, [providerMode, runClaudeConversion, runChatGPTConversion, showToast]);
+
+  // Nút Dán Clipboard truyền thống
+  const handleOneClickPaste = useCallback(async () => {
     setConverterError('');
     setConverterOutput('');
     setParsedProfile(null);
@@ -184,7 +300,7 @@ function App() {
     try {
       text = await navigator.clipboard.readText();
     } catch {
-      showToast('Không thể đọc Clipboard. Vui lòng dán thủ công mã vào ô bên dưới.', 'error');
+      showToast('Không thể đọc Clipboard. Vui lòng dán thủ công vào ô bên dưới.', 'error');
       return;
     }
 
@@ -193,8 +309,8 @@ function App() {
     if (!text) {
       showToast(
         providerMode === 'claude'
-          ? 'Clipboard đang trống! Vui lòng copy mã sessionKey (sk-ant-sid...) từ claude.ai rồi bấm lại nút này.'
-          : 'Clipboard đang trống! Vui lòng copy JSON session từ chatgpt.com/api/auth/session rồi bấm lại nút này.',
+          ? 'Clipboard trống! Vui lòng copy mã sessionKey từ claude.ai rồi bấm lại nút này.'
+          : 'Clipboard trống! Vui lòng copy JSON session từ chatgpt.com/api/auth/session rồi bấm lại nút này.',
         'info'
       );
       return;
@@ -206,22 +322,18 @@ function App() {
       if (text.includes('sk-ant-')) {
         runClaudeConversion(text);
       } else {
-        showToast('Nội dung trong Clipboard không phải mã Claude Session Key (phải bắt đầu bằng sk-ant-).', 'error');
         setConverterError('Mã trong Clipboard không đúng định dạng Claude Session Key (sk-ant-...).');
       }
     } else {
-      // Tab ChatGPT
       try {
         const session: ChatGPTSession = JSON.parse(text);
         if (session.accessToken) {
           runChatGPTConversion(text);
         } else {
-          showToast('Nội dung JSON trong Clipboard không chứa accessToken ChatGPT.', 'error');
-          setConverterError('Nội dung JSON trong Clipboard không hợp lệ (Thiếu accessToken).');
+          setConverterError('Dữ liệu JSON trong Clipboard không chứa accessToken ChatGPT.');
         }
       } catch {
-        showToast('Nội dung Clipboard không phải là JSON Session hợp lệ của ChatGPT.', 'error');
-        setConverterError('Nội dung trong Clipboard không phải là định dạng JSON ChatGPT hợp lệ.');
+        setConverterError('Nội dung trong Clipboard không phải định dạng JSON ChatGPT hợp lệ.');
       }
     }
   }, [providerMode, runClaudeConversion, runChatGPTConversion, showToast]);
@@ -451,6 +563,17 @@ function App() {
     }
   }, [converterOutput, showToast]);
 
+  // Mã Bookmarklet Siêu Tốc 1-Click
+  const claudeBookmarkletCode = `javascript:(function(){var m=document.cookie.match(/sessionKey=([^;]+)/);if(m&&m[1]){window.open('http://localhost:5173/?sessionKey='+encodeURIComponent(m[1]),'_blank');}else{alert('Không tìm thấy cookie sessionKey trên claude.ai!');}})();`;
+  const chatgptBookmarkletCode = `javascript:(function(){fetch('https://chatgpt.com/api/auth/session').then(r=>r.json()).then(d=>{window.open('http://localhost:5173/?session='+encodeURIComponent(JSON.stringify(d)),'_blank');}).catch(()=>window.open('https://chatgpt.com/api/auth/session','_blank'));})();`;
+
+  const activeBookmarkletCode = providerMode === 'claude' ? claudeBookmarkletCode : chatgptBookmarkletCode;
+
+  const copyBookmarkletCode = () => {
+    navigator.clipboard.writeText(activeBookmarkletCode);
+    showToast(`Đã sao chép mã Bookmarklet 1-Click (${providerMode === 'claude' ? 'Claude' : 'ChatGPT'})!`, 'success');
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-outfit relative">
       
@@ -536,20 +659,94 @@ function App() {
           </div>
         </div>
 
-        {/* Nút 1-Click Clipboard Đọc Clipboard Thực Tế */}
-        <div className="flex justify-center">
-          <button
-            onClick={handleOneClickPasteAndConvert}
-            className={`group text-xs font-extrabold text-white px-8 py-3 rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 hover:-translate-y-0.5 active:scale-95 cursor-pointer ${
-              providerMode === 'claude'
-                ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600'
-                : 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600'
-            }`}
-            title={`Dán mã ${providerMode === 'claude' ? 'Claude sessionKey' : 'ChatGPT Session'} từ Clipboard để chuyển đổi`}
-          >
-            <ClipboardCheck className="w-4 h-4" />
-            <span>📋 Dán từ Clipboard & Chuyển Đổi {providerMode === 'claude' ? 'Claude' : 'ChatGPT'} (1-Click)</span>
-          </button>
+        {/* NÚT 1-CLICK TỰ ĐỘNG LẤY & CHUYỂN ĐỔI SIÊU TỐC */}
+        <div className="flex flex-col items-center space-y-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {/* Nút 1-Click Bookmarklet Guide */}
+            <button
+              onClick={() => setShowBookmarkGuide(!showBookmarkGuide)}
+              className="text-xs font-extrabold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-5 py-3 rounded-2xl shadow-sm transition-all flex items-center gap-2"
+            >
+              <Bookmark className={`w-4 h-4 ${providerMode === 'claude' ? 'text-amber-600' : 'text-purple-600'}`} />
+              <span>📌 Nút 1-ClickBookmark (Kéo 1 lần dùng mãi)</span>
+            </button>
+
+            {/* Nút 1-Click Tự Động Mở Trang lấy Session */}
+            <button
+              onClick={handleAutoOpenAndFetch}
+              className={`text-xs font-extrabold text-white px-7 py-3 rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 hover:-translate-y-0.5 active:scale-95 cursor-pointer ${
+                providerMode === 'claude'
+                  ? 'bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700'
+                  : 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 animate-pulse" />
+              <span>⚡ Mở Trang & Tự Động Lấy Session {providerMode === 'claude' ? 'Claude' : 'ChatGPT'} (1-Click)</span>
+            </button>
+
+            {/* Nút Dán Clipboard Nhanh */}
+            <button
+              onClick={handleOneClickPaste}
+              className="text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 px-4 py-3 rounded-2xl shadow-sm transition-all flex items-center gap-1.5"
+              title="Dán nhanh nội dung từ Clipboard"
+            >
+              <ClipboardCheck className="w-4 h-4 text-slate-500" />
+              <span>Dán từ Clipboard</span>
+            </button>
+          </div>
+
+          {/* Card Hướng Dẫn Kéo Nút 1-Click Bookmarklet */}
+          {showBookmarkGuide && (
+            <div className={`w-full max-w-2xl border rounded-2xl p-5 shadow-md space-y-3 animate-fade-in ${
+              providerMode === 'claude' 
+                ? 'bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-amber-200 text-amber-950' 
+                : 'bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border-purple-200 text-purple-950'
+            }`}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-extrabold flex items-center gap-2">
+                  <Bookmark className={`w-4.5 h-4.5 ${providerMode === 'claude' ? 'text-amber-600' : 'text-purple-600'}`} />
+                  🚀 Nút 1-Click Chuẩn Nhất (Kéo Lên Bookmark Bar):
+                </h3>
+                <button 
+                  onClick={() => setShowBookmarkGuide(false)}
+                  className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
+                    providerMode === 'claude' ? 'bg-amber-100 text-amber-900' : 'bg-purple-100 text-purple-900'
+                  }`}
+                >
+                  Đóng ✕
+                </button>
+              </div>
+
+              <div className="text-xs space-y-2 font-light leading-relaxed">
+                <p>
+                  Kéo thả nút màu sắc bên dưới lên <strong>Thanh Dấu Trang (Bookmarks Bar / Ctrl+Shift+B)</strong> của Chrome. Khi đang ở trang <code className="font-mono font-bold">{providerMode === 'claude' ? 'claude.ai' : 'chatgpt.com'}</code>, bạn chỉ cần bấm nút này 1 lần là Session sẽ tự động gửi về đây và xuất ra JSON ngay lập tức!
+                </p>
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <a
+                    href={activeBookmarkletCode}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      alert('Hãy KÉO THẢ nút này lên Thanh Dấu Trang (Bookmarks Bar) của trình duyệt!');
+                    }}
+                    className={`cursor-grab text-xs font-extrabold text-white px-5 py-2.5 rounded-xl shadow-md flex items-center gap-1.5 hover:scale-105 transition-transform ${
+                      providerMode === 'claude' ? 'bg-gradient-to-r from-amber-600 to-orange-600' : 'bg-gradient-to-r from-purple-600 to-indigo-600'
+                    }`}
+                  >
+                    <Bookmark className="w-4 h-4" />
+                    📌 Kéo Nút Này Lên Bookmark Bar ({providerMode === 'claude' ? 'Claude' : 'ChatGPT'})
+                  </a>
+
+                  <button
+                    onClick={copyBookmarkletCode}
+                    className="text-xs font-bold bg-white hover:bg-slate-50 border px-3.5 py-2.5 rounded-xl transition-colors flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    Sao Chép Mã Code
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Bố Cục Hai Bảng Cân Đối Đối Xứng */}
