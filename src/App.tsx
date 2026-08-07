@@ -163,7 +163,7 @@ function App() {
 
     const sessionKey = skMatch ? skMatch[0] : text.trim();
     const now = new Date();
-    const expiresIn = 31536000;
+    const expiresIn = 31536000; // 1 năm
     const expiresAt = new Date(now.getTime() + expiresIn * 1000);
     const subKey = sessionKey.length > 25 ? sessionKey.substring(13, 21) : 'session';
     const email = `claude-${subKey}@claude.ai`;
@@ -279,13 +279,13 @@ function App() {
       }
     } catch {}
 
-    // Nếu chưa có trong bộ nhớ tạm, mở trang tương ứng trong Tab mới
+    // Nếu chưa có trong bộ nhớ tạm, mở trang API tương ứng trong Tab mới
     if (providerMode === 'claude') {
-      window.open('https://claude.ai', '_blank');
-      showToast('Đã mở claude.ai! Hãy copy cookie sessionKey rồi quay lại đây.', 'info');
+      window.open('https://claude.ai/api/organizations', '_blank');
+      showToast('Đã mở Claude Organizations API! Hãy copy mã JSON rồi dán lại đây.', 'info');
     } else {
       window.open('https://chatgpt.com/api/auth/session', '_blank');
-      showToast('Đã mở ChatGPT Session! Hãy copy mã JSON (Ctrl+A Ctrl+C) rồi quay lại đây.', 'info');
+      showToast('Đã mở ChatGPT Session API! Hãy copy mã JSON (Ctrl+A Ctrl+C) rồi quay lại đây.', 'info');
     }
   }, [providerMode, runClaudeConversion, runChatGPTConversion, showToast]);
 
