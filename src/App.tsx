@@ -154,23 +154,54 @@ function App() {
     }
   }, []);
 
+  // Xử lý thông minh Claude Session Key & Organization JSON từ claude.ai/api/organizations
   const runClaudeConversion = useCallback((text: string) => {
-    const skMatch = text.match(/sk-ant-[A-Za-z0-9_-]+/i);
-    if (!skMatch && !text.includes('sk-ant-')) {
-      setConverterError('Mã Claude Session Key phải bắt đầu bằng sk-ant- (Ví dụ: sk-ant-sid01-..., sk-ant-sid02-...).');
-      return;
+    let sessionKey = '';
+    let orgId = '';
+    let email = '';
+    let name = '';
+
+    // Tự động đọc dữ liệu nếu người dùng dán JSON từ https://claude.ai/api/organizations
+    if (text.includes('[') || text.includes('{')) {
+      try {
+        const parsed = JSON.parse(text);
+        const orgObj = Array.isArray(parsed) ? parsed[0] : parsed;
+        if (orgObj) {
+          if (orgObj.uuid) orgId = orgObj.uuid;
+          if (orgObj.name) {
+            name = orgObj.name;
+            const emailMatch = orgObj.name.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+            if (emailMatch) email = emailMatch[1];
+          }
+        }
+      } catch {}
     }
 
-    const sessionKey = skMatch ? skMatch[0] : text.trim();
+    // Tìm kiếm mã sessionKey dạng sk-ant-
+    const skMatch = text.match(/sk-ant-[A-Za-z0-9_-]+/i);
+    if (skMatch) {
+      sessionKey = skMatch[0];
+    } else {
+      sessionKey = text.trim();
+    }
+
+    // Email dự phòng nếu không trích xuất được từ Organization JSON
+    if (!email) {
+      const subKey = sessionKey.length > 25 ? sessionKey.substring(13, 21) : 'user';
+      email = `claude-${subKey}@claude.ai`;
+    }
+
+    if (!name) {
+      name = `Tài khoản Claude Web (${email})`;
+    }
+
     const now = new Date();
     const expiresIn = 31536000; // 1 năm
     const expiresAt = new Date(now.getTime() + expiresIn * 1000);
-    const subKey = sessionKey.length > 25 ? sessionKey.substring(13, 21) : 'session';
-    const email = `claude-${subKey}@claude.ai`;
 
     setParsedProfile({
       provider: 'claude',
-      name: `Tài khoản Claude Web (${sessionKey.substring(0, 16)}...)`,
+      name: name,
       email: email,
       avatar: '',
       plan: 'Claude Web',
@@ -185,7 +216,7 @@ function App() {
       expiresIn,
       providerSpecificData: {
         sessionKey: sessionKey,
-        orgId: '',
+        orgId: orgId,
       },
       id: generateUUID(),
       provider: 'claude',
@@ -200,7 +231,7 @@ function App() {
 
     setConverterOutput(JSON.stringify(claudeConnection, null, 2));
     setConverterError('');
-    showToast('⚡ Đã chuyển đổi Claude Session Key thành công!', 'success');
+    showToast('⚡ Đã trích xuất & chuyển đổi thành công JSON Claude 9Router!', 'success');
   }, [showToast]);
 
   const runChatGPTConversion = useCallback((inputJsonStr: string) => {
@@ -238,7 +269,7 @@ function App() {
     if (!input) {
       setConverterError(
         providerMode === 'claude'
-          ? 'Vui lòng dán mã sessionKey (sk-ant-sid...) của Claude vào ô bên dưới.'
+          ? 'Vui lòng dán mã sessionKey hoặc dữ liệu JSON từ https://claude.ai/api/organizations vào ô bên dưới.'
           : 'Vui lòng dán nội dung JSON Auth Session của ChatGPT vào ô bên dưới.'
       );
       return;
@@ -262,7 +293,7 @@ function App() {
       const text = await navigator.clipboard.readText();
       if (text && text.trim()) {
         const trimmed = text.trim();
-        if (providerMode === 'claude' && trimmed.includes('sk-ant-')) {
+        if (providerMode === 'claude' && (trimmed.includes('sk-ant-') || trimmed.includes('Organization') || trimmed.includes('uuid'))) {
           setSessionInput(trimmed);
           runClaudeConversion(trimmed);
           return;
@@ -282,7 +313,7 @@ function App() {
     // Nếu chưa có trong bộ nhớ tạm, mở trang API tương ứng trong Tab mới
     if (providerMode === 'claude') {
       window.open('https://claude.ai/api/organizations', '_blank');
-      showToast('Đã mở Claude Organizations API! Hãy copy mã JSON rồi dán lại đây.', 'info');
+      showToast('Đã mở Claude Organizations API! Hãy copy mã JSON (Ctrl+A Ctrl+C) rồi dán vào ô bên dưới.', 'info');
     } else {
       window.open('https://chatgpt.com/api/auth/session', '_blank');
       showToast('Đã mở ChatGPT Session API! Hãy copy mã JSON (Ctrl+A Ctrl+C) rồi quay lại đây.', 'info');
@@ -633,7 +664,7 @@ function App() {
                   {parsedProfile 
                     ? `Hồ Sơ ${(parsedProfile.provider || providerMode) === 'claude' ? 'Claude' : 'ChatGPT'} Đã Phân Tích` 
                     : providerMode === 'claude'
-                    ? 'Session Key Claude Web (Đầu Vào)'
+                    ? 'Session Key / Organization JSON (Đầu Vào)'
                     : 'JSON Session ChatGPT (Đầu Vào)'
                   }
                 </span>
@@ -666,7 +697,7 @@ function App() {
                 onChange={(e) => setSessionInput(e.target.value)}
                 placeholder={
                   providerMode === 'claude'
-                    ? 'Dán mã sessionKey (sk-ant-sid01-..., sk-ant-sid02-...) của Claude tại đây...'
+                    ? 'Dán mã sessionKey (sk-ant-sid...) HOẶC dữ liệu JSON từ https://claude.ai/api/organizations tại đây...'
                     : 'Dán JSON Auth Session của ChatGPT tại đây...'
                 }
                 className="w-full flex-grow min-h-[400px] border-0 focus:ring-0 focus:outline-none p-4.5 text-xs font-mono text-slate-700 placeholder-slate-400 resize-none leading-relaxed bg-white"
