@@ -1,3 +1,5 @@
+export type ProviderType = 'codex' | 'claude';
+
 export interface ChatGPTSession {
   user?: {
     id?: string;
@@ -21,8 +23,10 @@ export interface CodexConnection {
   testStatus: string;
   expiresIn: number;
   providerSpecificData: {
-    chatgptAccountId: string;
-    chatgptPlanType: string;
+    chatgptAccountId?: string;
+    chatgptPlanType?: string;
+    sessionKey?: string;
+    orgId?: string;
   };
   id: string;
   provider: string;
@@ -36,6 +40,7 @@ export interface CodexConnection {
 }
 
 export interface ParsedProfile {
+  provider?: ProviderType;
   name: string;
   email: string;
   avatar: string;

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { 
   ArrowRight, AlertCircle, RefreshCw, FileJson, Zap, Download, 
-  Plus, Check, Info, Cpu, ClipboardCheck
+  ExternalLink, Plus, Check, Info, Cpu, ClipboardCheck
 } from 'lucide-react';
 
 // Import Types
@@ -87,6 +87,7 @@ function App() {
     const email = `claude-${subKey}@claude.ai`;
 
     setParsedProfile({
+      provider: 'claude',
       name: `Tài khoản Claude Web (${sessionKey.substring(0, 16)}...)`,
       email: email,
       avatar: '',
@@ -135,7 +136,7 @@ function App() {
       const plan = session.account?.planType || 'plus';
       const expires = session.expires || '';
 
-      setParsedProfile({ name, email, avatar, plan, expires });
+      setParsedProfile({ provider: 'codex', name, email, avatar, plan, expires });
 
       const codexConnection = convertSessionToCodex(session, 1);
       setConverterOutput(JSON.stringify(codexConnection, null, 2));
@@ -561,7 +562,7 @@ function App() {
                   providerMode === 'claude' ? 'text-amber-950' : 'text-purple-950'
                 }`}>
                   {parsedProfile 
-                    ? `Hồ Sơ ${parsedProfile.provider === 'claude' ? 'Claude' : 'ChatGPT'} Đã Phân Tích` 
+                    ? `Hồ Sơ ${(parsedProfile.provider || providerMode) === 'claude' ? 'Claude' : 'ChatGPT'} Đã Phân Tích` 
                     : providerMode === 'claude'
                     ? 'Session Key Claude Web (Đầu Vào)'
                     : 'JSON Session ChatGPT (Đầu Vào)'
