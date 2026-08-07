@@ -1,4 +1,3 @@
-
 import { Zap } from 'lucide-react';
 import { ParsedProfile } from '../types/connection';
 import { formatVietnameseDate } from '../utils/helpers';
@@ -8,6 +7,9 @@ interface ProfileCardProps {
 }
 
 export function ProfileCard({ parsedProfile }: ProfileCardProps) {
+  const planName = parsedProfile.plan || 'Free';
+  const isPlus = planName.toLowerCase() === 'plus';
+
   return (
     <div className="p-6 flex-grow flex flex-col justify-center items-center space-y-6 bg-gradient-to-b from-purple-50/20 to-white animate-fade-in">
       {/* Ảnh đại diện người dùng */}
@@ -29,18 +31,18 @@ export function ProfileCard({ parsedProfile }: ProfileCardProps) {
 
       {/* Tên & Email */}
       <div className="text-center space-y-1">
-        <h3 className="text-base font-extrabold text-purple-950">{parsedProfile.name}</h3>
+        <h3 className="text-base font-extrabold text-purple-950">{parsedProfile.name || 'Tài khoản 9Router'}</h3>
         <p className="text-xs text-slate-500 font-light">{parsedProfile.email}</p>
       </div>
 
-      {/* Phân loại tài khoản (Huy hiệu lấp lánh) */}
+      {/* Phân loại tài khoản */}
       <div className="flex items-center gap-2">
         <span className={`px-3 py-1 rounded-full text-[10px] font-bold shadow-sm uppercase tracking-wider ${
-          parsedProfile.plan.toLowerCase() === 'plus' 
+          isPlus 
             ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-purple-500/10' 
             : 'bg-purple-100 text-purple-700'
         }`}>
-          Gói ChatGPT {parsedProfile.plan.toUpperCase()}
+          Gói {planName.toUpperCase()}
         </span>
       </div>
 

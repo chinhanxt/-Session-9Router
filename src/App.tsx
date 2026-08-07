@@ -1,14 +1,14 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { 
   ArrowRight, AlertCircle, RefreshCw, FileJson, Zap, Download, 
-  ExternalLink, Key, Plus, Check, Info
+  ExternalLink, Key, Plus, Check, Info, Cpu
 } from 'lucide-react';
 
 // Import Types
 import { ChatGPTSession, CodexConnection, ParsedProfile } from './types/connection';
 
 // Import Helpers
-import { convertSessionToCodex } from './utils/helpers';
+import { convertSessionToCodex, generateUUID } from './utils/helpers';
 
 // Import Components
 import { HighlightedJson } from './components/HighlightedJson';
@@ -28,13 +28,15 @@ function App() {
   const [savedConnections, setSavedConnections] = useState<CodexConnection[]>(() => {
     try {
       const saved = localStorage.getItem('9router_saved_connections');
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed.filter(c => c && typeof c === 'object' && c.id) : [];
     } catch {
       return [];
     }
   });
 
-  // Lưu trạng thái cấu hình của file backup khác ngoài providerConnections (như settings, apiKeys, proxyPools...)
+  // Lưu trạng thái cấu hình của file backup khác ngoài providerConnections
   const [backupMetadata, setBackupMetadata] = useState<any>(() => {
     try {
       const saved = localStorage.getItem('9router_backup_metadata');
@@ -64,9 +66,10 @@ function App() {
 
   // Hàm bổ trợ để lưu danh sách vào localStorage
   const saveConnectionsToStorage = useCallback((conns: CodexConnection[]) => {
-    setSavedConnections(conns);
+    const validConns = conns.filter(c => c && typeof c === 'object' && c.id);
+    setSavedConnections(validConns);
     try {
-      localStorage.setItem('9router_saved_connections', JSON.stringify(conns));
+      localStorage.setItem('9router_saved_connections', JSON.stringify(validConns));
     } catch (err) {
       console.error('Không thể lưu vào localStorage', err);
     }
@@ -77,20 +80,66 @@ function App() {
     setConverterOutput('');
     setParsedProfile(null);
 
-    if (!sessionInput.trim()) {
-      setConverterError('Vui lòng nhập hoặc dán nội dung JSON session của ChatGPT vào ô bên dưới.');
+    const input = sessionInput.trim();
+    if (!input) {
+      setConverterError('Vui lòng dán nội dung JSON session của ChatGPT hoặc mã sessionKey Claude (sk-ant-sid...) vào ô bên dưới.');
       return;
     }
 
+    // Nếu dán mã Claude sessionKey (sk-ant-...)
+    if (input.includes('sk-ant-') || input.includes('sessionKey')) {
+      const skMatch = input.match(/sk-ant-[A-Za-z0-9_-]+/i);
+      const sessionKey = skMatch ? skMatch[0] : input;
+
+      const now = new Date();
+      const expiresIn = 31536000; // 1 năm
+      const expiresAt = new Date(now.getTime() + expiresIn * 1000);
+      const subKey = sessionKey.length > 25 ? sessionKey.substring(13, 21) : 'session';
+      const email = `claude-${subKey}@claude.ai`;
+
+      setParsedProfile({
+        name: `Tài khoản Claude Web (${sessionKey.substring(0, 16)}...)`,
+        email: email,
+        avatar: '',
+        plan: 'Claude Web',
+        expires: expiresAt.toISOString(),
+      });
+
+      const claudeConnection: CodexConnection = {
+        accessToken: sessionKey,
+        refreshToken: '',
+        expiresAt: expiresAt.toISOString(),
+        testStatus: 'active',
+        expiresIn,
+        providerSpecificData: {
+          sessionKey: sessionKey,
+          orgId: '',
+        },
+        id: generateUUID(),
+        provider: 'claude',
+        authType: 'session_key',
+        name: email,
+        email: email,
+        priority: 1,
+        isActive: true,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+      };
+
+      setConverterOutput(JSON.stringify(claudeConnection, null, 2));
+      showToast('Đã phân tích Claude Session thành công!', 'success');
+      return;
+    }
+
+    // Nếu dán JSON ChatGPT Session
     try {
-      const session: ChatGPTSession = JSON.parse(sessionInput);
+      const session: ChatGPTSession = JSON.parse(input);
 
       if (!session.accessToken) {
-        setConverterError('Không tìm thấy mã khóa "accessToken" trong dữ liệu JSON. Vui lòng kiểm tra lại cấu trúc session.');
+        setConverterError('Không tìm thấy mã khóa "accessToken" trong dữ liệu JSON. Vui lòng kiểm tra lại cấu trúc session ChatGPT.');
         return;
       }
 
-      // Phân tích thông tin người dùng từ file session
       const name = session.user?.name || 'Người dùng ChatGPT';
       const email = session.user?.email || 'Không có email';
       const avatar = session.user?.picture || '';
@@ -99,12 +148,11 @@ function App() {
 
       setParsedProfile({ name, email, avatar, plan, expires });
 
-      // Priority mặc định là 1
       const codexConnection = convertSessionToCodex(session, 1);
       setConverterOutput(JSON.stringify(codexConnection, null, 2));
-      showToast('Đã phân tích session thành công!', 'success');
+      showToast('Đã phân tích ChatGPT Session thành công!', 'success');
     } catch {
-      setConverterError('Định dạng JSON không hợp lệ. Vui lòng kiểm tra và sửa lại các ký tự bị lỗi.');
+      setConverterError('Định dạng không hợp lệ. Vui lòng dán JSON Session ChatGPT hoặc mã Claude sessionKey (sk-ant-sid...).');
     }
   }, [sessionInput, showToast]);
 
@@ -117,7 +165,7 @@ function App() {
       
       const updatedConns = [...savedConnections];
       const index = updatedConns.findIndex(
-        (c) => c.email === newConnection.email || c.name === newConnection.name
+        (c) => (c.email && c.email === newConnection.email) || (c.name && c.name === newConnection.name)
       );
 
       let isUpdate = false;
@@ -126,8 +174,8 @@ function App() {
         updatedConns[index] = {
           ...newConnection,
           id: updatedConns[index].id,
-          priority: updatedConns[index].priority, // Giữ nguyên độ ưu tiên cũ
-          isActive: updatedConns[index].isActive // Giữ nguyên trạng thái active cũ
+          priority: updatedConns[index].priority,
+          isActive: updatedConns[index].isActive
         };
         isUpdate = true;
       } else {
@@ -144,8 +192,8 @@ function App() {
       
       showToast(
         isUpdate 
-          ? `Đã cập nhật token mới cho tài khoản "${newConnection.email}" thành công!` 
-          : `Đã lưu tài khoản "${newConnection.email}" vào danh sách quản lý thành công!`,
+          ? `Đã cập nhật token mới cho tài khoản "${newConnection.email || newConnection.name}" thành công!` 
+          : `Đã lưu tài khoản "${newConnection.email || newConnection.name}" vào danh sách quản lý thành công!`,
         'success'
       );
     } catch {
@@ -193,7 +241,7 @@ function App() {
 
         importedConns.forEach((newConn) => {
           const index = updatedConns.findIndex(
-            (c) => c.email === newConn.email || c.name === newConn.name
+            (c) => (c.email && c.email === newConn.email) || (c.name && c.name === newConn.name)
           );
           if (index > -1) {
             updatedConns[index] = {
@@ -217,8 +265,6 @@ function App() {
       }
     };
     reader.readAsText(file);
-    
-    // Reset file input để có thể chọn lại cùng 1 file
     e.target.value = '';
   };
 
@@ -375,7 +421,7 @@ function App() {
             </h1>
           </div>
           <p className="text-slate-500 text-sm max-w-lg mx-auto font-light leading-relaxed">
-            Chuyển đổi ChatGPT Auth Session sang định dạng cấu hình Codex Connection tương thích hoàn toàn với 9Router.
+            Chuyển đổi ChatGPT Session & Claude Session Key sang định dạng cấu hình 9Router tương thích hoàn toàn.
           </p>
         </div>
 
@@ -389,10 +435,10 @@ function App() {
               <div className="flex items-center gap-2">
                 <FileJson className="w-4 h-4 text-purple-600 shrink-0" />
                 <span className="text-xs font-bold text-purple-950 uppercase tracking-wider whitespace-nowrap">
-                  {parsedProfile ? 'Hồ Sơ ChatGPT Đã Phân Tích' : 'JSON Session ChatGPT (Đầu Vào)'}
+                  {parsedProfile ? 'Hồ Sơ Đã Phân Tích' : 'JSON Session ChatGPT / Claude (Đầu Vào)'}
                 </span>
               </div>
-              <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+              <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-auto">
                 {parsedProfile ? (
                   <button
                     onClick={handleEditSession}
@@ -401,17 +447,31 @@ function App() {
                     Chỉnh sửa
                   </button>
                 ) : (
-                  <a
-                    href="https://chatgpt.com/api/auth/session"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-purple-700 hover:text-purple-850 flex items-center gap-1 font-bold bg-purple-100/50 border border-purple-200/50 hover:bg-purple-100 px-2.5 py-1 rounded-xl transition-all shadow-sm"
-                    title="Nhấp để tới trang API Auth Session của ChatGPT lấy mã JSON"
-                  >
-                    <Key className="w-3.5 h-3.5 shrink-0" />
-                    Lấy ChatGPT Session
-                    <ExternalLink className="w-3 h-3 ml-0.5 opacity-70 shrink-0" />
-                  </a>
+                  <>
+                    <a
+                      href="https://chatgpt.com/api/auth/session"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-purple-700 hover:text-purple-850 flex items-center gap-1 font-bold bg-purple-100/50 border border-purple-200/50 hover:bg-purple-100 px-2.5 py-1 rounded-xl transition-all shadow-sm"
+                      title="Nhấp để tới trang API Auth Session của ChatGPT lấy mã JSON"
+                    >
+                      <Key className="w-3.5 h-3.5 shrink-0" />
+                      Lấy ChatGPT Session
+                      <ExternalLink className="w-3 h-3 ml-0.5 opacity-70 shrink-0" />
+                    </a>
+
+                    <a
+                      href="https://claude.ai"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-amber-800 hover:text-amber-950 flex items-center gap-1 font-bold bg-amber-100/50 border border-amber-200/50 hover:bg-amber-100 px-2.5 py-1 rounded-xl transition-all shadow-sm"
+                      title="Nhấp để tới trang Claude.ai"
+                    >
+                      <Cpu className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                      Claude.ai
+                      <ExternalLink className="w-3 h-3 ml-0.5 opacity-70 shrink-0" />
+                    </a>
+                  </>
                 )}
                 <button
                   onClick={handleClearConverter}
@@ -430,7 +490,7 @@ function App() {
               <textarea
                 value={sessionInput}
                 onChange={(e) => setSessionInput(e.target.value)}
-                placeholder='Dán JSON Auth Session của bạn tại đây... (Ví dụ: { "accessToken": "eyJhbG...", "sessionToken": "sess-..." })'
+                placeholder='Dán JSON Auth Session ChatGPT hoặc mã Claude sessionKey (sk-ant-sid...) tại đây...'
                 className="w-full flex-grow min-h-[400px] border-0 focus:ring-0 focus:outline-none p-4.5 text-xs font-mono text-slate-700 placeholder-slate-400 resize-none leading-relaxed bg-white"
                 spellCheck={false}
               />
