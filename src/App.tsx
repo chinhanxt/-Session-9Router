@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 
 // Import Types
-import { ChatGPTSession, CodexConnection, ParsedProfile } from './types/connection';
+import { ChatGPTSession, CodexConnection, ParsedProfile, ProviderType } from './types/connection';
 
 // Import Helpers
 import { convertSessionToCodex, generateUUID } from './utils/helpers';
@@ -17,6 +17,7 @@ import { LibraryManager } from './components/LibraryManager';
 import { Instructions } from './components/Instructions';
 
 function App() {
+  const [providerMode, setProviderMode] = useState<ProviderType>('codex');
   const [sessionInput, setSessionInput] = useState('');
   const [converterOutput, setConverterOutput] = useState('');
   const [converterError, setConverterError] = useState('');
@@ -126,17 +127,21 @@ function App() {
 
     const input = sessionInput.trim();
     if (!input) {
-      setConverterError('Vui lòng dán nội dung JSON session của ChatGPT hoặc mã sessionKey Claude (sk-ant-sid...) vào ô bên dưới.');
+      setConverterError(
+        providerMode === 'claude'
+          ? 'Vui lòng dán mã sessionKey (sk-ant-sid...) của Claude vào ô bên dưới.'
+          : 'Vui lòng dán nội dung JSON Auth Session của ChatGPT vào ô bên dưới.'
+      );
       return;
     }
 
-    // Nếu dán mã Claude sessionKey (sk-ant-...)
-    if (input.includes('sk-ant-') || input.includes('sessionKey')) {
+    // Nếu ở chế độ Claude hoặc input chứa sk-ant-
+    if (providerMode === 'claude' || input.includes('sk-ant-') || input.includes('sessionKey')) {
       runClaudeConversion(input);
       return;
     }
 
-    // Nếu dán JSON ChatGPT Session
+    // Nếu ở chế độ ChatGPT
     try {
       const session: ChatGPTSession = JSON.parse(input);
 
@@ -157,46 +162,65 @@ function App() {
       setConverterOutput(JSON.stringify(codexConnection, null, 2));
       showToast('Đã phân tích ChatGPT Session thành công!', 'success');
     } catch {
-      setConverterError('Định dạng không hợp lệ. Vui lòng dán JSON Session ChatGPT hoặc mã Claude sessionKey (sk-ant-sid...).');
+      setConverterError('Định dạng không hợp lệ. Vui lòng dán JSON Session ChatGPT hoặc chuyển sang Tab Claude để dán mã sessionKey.');
     }
-  }, [sessionInput, runClaudeConversion, showToast]);
+  }, [sessionInput, providerMode, runClaudeConversion, showToast]);
 
-  // Nút 1-Click: Dán từ Clipboard & Chuyển Đổi Siêu Tốc
+  // Nút 1-Click: Dán từ Clipboard & Chuyển Đổi Siêu Tốc theo Tab
   const handleOneClickPasteAndConvert = useCallback(async () => {
     let text = '';
     try {
       text = await navigator.clipboard.readText();
     } catch {}
 
-    if (!text || !text.trim()) {
-      text = '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';
-    }
-
-    setSessionInput(text);
-
-    if (text.includes('sk-ant-') || text.includes('sessionKey')) {
+    if (providerMode === 'claude') {
+      if (!text || !text.trim() || !text.includes('sk-ant-')) {
+        text = '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';
+      }
+      setSessionInput(text);
       runClaudeConversion(text);
     } else {
-      try {
-        const session: ChatGPTSession = JSON.parse(text);
-        if (session.accessToken) {
-          const name = session.user?.name || 'Người dùng ChatGPT';
-          const email = session.user?.email || 'Không có email';
-          const avatar = session.user?.picture || '';
-          const plan = session.account?.planType || 'free';
-          const expires = session.expires || '';
-          setParsedProfile({ name, email, avatar, plan, expires });
-          const codexConnection = convertSessionToCodex(session, 1);
-          setConverterOutput(JSON.stringify(codexConnection, null, 2));
-          showToast('⚡ Đã chuyển đổi ChatGPT Session thành công!', 'success');
-        } else {
-          runClaudeConversion(text);
-        }
-      } catch {
+      // Tab ChatGPT
+      if (!text || !text.trim()) {
+        showToast('Clipboard trống! Hãy copy mã JSON ChatGPT trước rồi bấm nút này.', 'info');
+        return;
+      }
+      setSessionInput(text);
+      if (text.includes('sk-ant-')) {
         runClaudeConversion(text);
+      } else {
+        try {
+          const session: ChatGPTSession = JSON.parse(text);
+          if (session.accessToken) {
+            const name = session.user?.name || 'Người dùng ChatGPT';
+            const email = session.user?.email || 'Không có email';
+            const avatar = session.user?.picture || '';
+            const plan = session.account?.planType || 'free';
+            const expires = session.expires || '';
+            setParsedProfile({ name, email, avatar, plan, expires });
+            const codexConnection = convertSessionToCodex(session, 1);
+            setConverterOutput(JSON.stringify(codexConnection, null, 2));
+            showToast('⚡ Đã chuyển đổi ChatGPT Session thành công!', 'success');
+          } else {
+            showToast('Nội dung JSON ChatGPT không hợp lệ.', 'error');
+          }
+        } catch {
+          showToast('Nội dung Clipboard không phải định dạng JSON ChatGPT.', 'error');
+        }
       }
     }
-  }, [runClaudeConversion, showToast]);
+  }, [providerMode, runClaudeConversion, showToast]);
+
+  const handleClearConverter = () => {
+    setSessionInput('');
+    setConverterOutput('');
+    setConverterError('');
+    setParsedProfile(null);
+  };
+
+  const handleEditSession = () => {
+    setParsedProfile(null);
+  };
 
   // Lưu tài khoản vừa chuyển đổi vào danh sách
   const handleSaveToList = useCallback(() => {
@@ -229,10 +253,11 @@ function App() {
       setConverterOutput('');
       setParsedProfile(null);
       
+      const providerLabel = newConnection.provider === 'claude' ? 'Claude Web' : 'ChatGPT';
       showToast(
         isUpdate 
-          ? `Đã cập nhật token mới cho tài khoản "${newConnection.email || newConnection.name}" thành công!` 
-          : `Đã lưu tài khoản "${newConnection.email || newConnection.name}" vào danh sách quản lý thành công!`,
+          ? `Đã cập nhật token mới cho tài khoản ${providerLabel} "${newConnection.email || newConnection.name}"!` 
+          : `Đã lưu tài khoản ${providerLabel} "${newConnection.email || newConnection.name}" vào danh sách quản lý!`,
         'success'
       );
     } catch {
@@ -411,17 +436,6 @@ function App() {
     }
   }, [converterOutput, showToast]);
 
-  const handleClearConverter = () => {
-    setSessionInput('');
-    setConverterOutput('');
-    setConverterError('');
-    setParsedProfile(null);
-  };
-
-  const handleEditSession = () => {
-    setParsedProfile(null);
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-outfit relative">
       
@@ -441,36 +455,85 @@ function App() {
         </div>
       )}
 
-      {/* Nền Gradient Tím Nhạt Phía Trên */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(147,51,234,0.06),transparent_60%)] pointer-events-none" />
+      {/* Nền Gradient Nổi Bật Phía Trên */}
+      <div className={`absolute inset-0 transition-colors duration-500 pointer-events-none ${
+        providerMode === 'claude'
+          ? 'bg-[radial-gradient(ellipse_at_top,rgba(217,119,6,0.08),transparent_60%)]'
+          : 'bg-[radial-gradient(ellipse_at_top,rgba(147,51,234,0.06),transparent_60%)]'
+      }`} />
 
       {/* Vùng Nội Dung Chính */}
       <div className="flex-grow max-w-6xl w-full mx-auto px-4 py-8 sm:py-12 relative z-10 flex flex-col justify-center space-y-8 animate-fade-in">
         
-        {/* Phần Tiêu Đề */}
+        {/* Phần Tiêu Đề & 2 Tabs Chính */}
         <div className="text-center space-y-3">
           <div className="inline-flex items-center gap-3 justify-center">
-            <div className="w-10 h-10 rounded-xl bg-purple-100 border border-purple-200 flex items-center justify-center shadow-md shadow-purple-500/5">
-              <Zap className="w-5 h-5 text-purple-600 text-glow-purple" />
+            <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shadow-md transition-colors ${
+              providerMode === 'claude' 
+                ? 'bg-amber-100 border-amber-200 shadow-amber-500/10' 
+                : 'bg-purple-100 border-purple-200 shadow-purple-500/5'
+            }`}>
+              {providerMode === 'claude' ? (
+                <Cpu className="w-5 h-5 text-amber-600" />
+              ) : (
+                <Zap className="w-5 h-5 text-purple-600" />
+              )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-purple-950 font-outfit">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-outfit">
               Bộ Chuyển Đổi Session 9Router
             </h1>
           </div>
-          <p className="text-slate-500 text-sm max-w-lg mx-auto font-light leading-relaxed">
-            Chuyển đổi ChatGPT Session & Claude Session Key sang định dạng cấu hình 9Router tương thích hoàn toàn.
+          <p className="text-slate-500 text-sm max-w-xl mx-auto font-light leading-relaxed">
+            Chuyển đổi <strong className="text-purple-650 font-semibold">ChatGPT Auth Session</strong> & <strong className="text-amber-700 font-semibold">Claude Web Session Key</strong> sang định dạng 9Router tương thích hoàn toàn.
           </p>
+
+          {/* 2 TABS CHÍNH: CHATGPT HOẶC CLAUDE */}
+          <div className="inline-flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm mt-3">
+            <button
+              onClick={() => {
+                setProviderMode('codex');
+                handleClearConverter();
+              }}
+              className={`text-xs font-bold px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 ${
+                providerMode === 'codex'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-purple-750 hover:bg-purple-50'
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              🤖 ChatGPT Session
+            </button>
+
+            <button
+              onClick={() => {
+                setProviderMode('claude');
+                handleClearConverter();
+              }}
+              className={`text-xs font-bold px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 ${
+                providerMode === 'claude'
+                  ? 'bg-amber-600 text-white shadow-md'
+                  : 'text-amber-800 hover:bg-amber-50'
+              }`}
+            >
+              <Cpu className="w-4 h-4" />
+              🧠 Claude Web Session
+            </button>
+          </div>
         </div>
 
-        {/* Nút 1-Click: Dán từ Clipboard & Chuyển Đổi Siêu Tốc */}
+        {/* Nút 1-Click Clipboard Theo Tab */}
         <div className="flex justify-center">
           <button
             onClick={handleOneClickPasteAndConvert}
-            className="group text-xs font-extrabold bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white px-8 py-3 rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 hover:-translate-y-0.5 active:scale-95 cursor-pointer"
-            title="Nhấn nút này để dán mã Claude sessionKey hoặc ChatGPT Session từ Clipboard và xuất ngay JSON 9Router bên màn hình phải!"
+            className={`group text-xs font-extrabold text-white px-8 py-3 rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 hover:-translate-y-0.5 active:scale-95 cursor-pointer ${
+              providerMode === 'claude'
+                ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600'
+                : 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600'
+            }`}
+            title={`Nhấn nút này để dán mã ${providerMode === 'claude' ? 'Claude sessionKey' : 'ChatGPT Session'} và xuất ngay JSON 9Router bên màn hình phải!`}
           >
             <ClipboardCheck className="w-4 h-4" />
-            <span>📋 Dán từ Clipboard & Chuyển Đổi Siêu Tốc (1-Click)</span>
+            <span>📋 Dán từ Clipboard & Chuyển Đổi {providerMode === 'claude' ? 'Claude' : 'ChatGPT'} (1-Click)</span>
           </button>
         </div>
 
@@ -478,13 +541,24 @@ function App() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
           
           {/* Bảng Bên Trái: Nhập Liệu / Hồ sơ người dùng */}
-          <div className="bg-white border border-purple-100/80 rounded-2xl shadow-sm overflow-hidden flex flex-col hover:border-purple-200/60 hover:shadow-md transition-all duration-300">
+          <div className={`bg-white border rounded-2xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-all duration-300 ${
+            providerMode === 'claude' ? 'border-amber-200/80 hover:border-amber-300' : 'border-purple-100/80 hover:border-purple-200/60'
+          }`}>
             {/* Header Bảng Nhập */}
-            <div className="bg-purple-50/30 border-b border-purple-100/50 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-h-[49px]">
+            <div className={`border-b px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-h-[49px] ${
+              providerMode === 'claude' ? 'bg-amber-50/40 border-amber-100/60' : 'bg-purple-50/30 border-purple-100/50'
+            }`}>
               <div className="flex items-center gap-2">
-                <FileJson className="w-4 h-4 text-purple-600 shrink-0" />
-                <span className="text-xs font-bold text-purple-950 uppercase tracking-wider whitespace-nowrap">
-                  {parsedProfile ? 'Hồ Sơ Đã Phân Tích' : 'JSON Session ChatGPT / Claude (Đầu Vào)'}
+                <FileJson className={`w-4 h-4 shrink-0 ${providerMode === 'claude' ? 'text-amber-600' : 'text-purple-600'}`} />
+                <span className={`text-xs font-bold uppercase tracking-wider whitespace-nowrap ${
+                  providerMode === 'claude' ? 'text-amber-950' : 'text-purple-950'
+                }`}>
+                  {parsedProfile 
+                    ? `Hồ Sơ ${parsedProfile.provider === 'claude' ? 'Claude' : 'ChatGPT'} Đã Phân Tích` 
+                    : providerMode === 'claude'
+                    ? 'Session Key Claude Web (Đầu Vào)'
+                    : 'JSON Session ChatGPT (Đầu Vào)'
+                  }
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-auto">
@@ -497,29 +571,31 @@ function App() {
                   </button>
                 ) : (
                   <>
-                    <a
-                      href="https://chatgpt.com/api/auth/session"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[10px] text-purple-700 hover:text-purple-850 flex items-center gap-1 font-bold bg-purple-100/50 border border-purple-200/50 hover:bg-purple-100 px-2.5 py-1 rounded-xl transition-all shadow-sm"
-                      title="Nhấp để tới trang API Auth Session của ChatGPT lấy mã JSON"
-                    >
-                      <Key className="w-3.5 h-3.5 shrink-0" />
-                      Lấy ChatGPT Session
-                      <ExternalLink className="w-3 h-3 ml-0.5 opacity-70 shrink-0" />
-                    </a>
-
-                    <a
-                      href="https://claude.ai"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[10px] text-amber-800 hover:text-amber-950 flex items-center gap-1 font-bold bg-amber-100/50 border border-amber-200/50 hover:bg-amber-100 px-2.5 py-1 rounded-xl transition-all shadow-sm"
-                      title="Nhấp để tới trang Claude.ai"
-                    >
-                      <Cpu className="w-3.5 h-3.5 shrink-0 text-amber-600" />
-                      Claude.ai
-                      <ExternalLink className="w-3 h-3 ml-0.5 opacity-70 shrink-0" />
-                    </a>
+                    {providerMode === 'codex' ? (
+                      <a
+                        href="https://chatgpt.com/api/auth/session"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-purple-750 hover:text-purple-900 flex items-center gap-1 font-bold bg-purple-50 border border-purple-200/60 hover:bg-purple-100 px-2 py-1 rounded-xl transition-all"
+                        title="Nhấp để tới trang API Auth Session của ChatGPT lấy mã JSON"
+                      >
+                        <Key className="w-3.5 h-3.5 shrink-0 text-purple-600" />
+                        Lấy ChatGPT Session
+                        <ExternalLink className="w-3 h-3 ml-0.5 opacity-70 shrink-0" />
+                      </a>
+                    ) : (
+                      <a
+                        href="https://claude.ai"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-amber-800 hover:text-amber-950 flex items-center gap-1 font-bold bg-amber-50 border border-amber-200/60 hover:bg-amber-100 px-2 py-1 rounded-xl transition-all"
+                        title="Nhấp để tới trang Claude.ai"
+                      >
+                        <Cpu className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                        Mở Claude.ai
+                        <ExternalLink className="w-3 h-3 ml-0.5 opacity-70 shrink-0" />
+                      </a>
+                    )}
                   </>
                 )}
                 <button
@@ -539,7 +615,11 @@ function App() {
               <textarea
                 value={sessionInput}
                 onChange={(e) => setSessionInput(e.target.value)}
-                placeholder='Dán JSON Auth Session ChatGPT hoặc mã Claude sessionKey (sk-ant-sid...) tại đây...'
+                placeholder={
+                  providerMode === 'claude'
+                    ? 'Dán mã sessionKey (sk-ant-sid01-..., sk-ant-sid02-...) của Claude tại đây...'
+                    : 'Dán JSON Auth Session của ChatGPT tại đây...'
+                }
                 className="w-full flex-grow min-h-[400px] border-0 focus:ring-0 focus:outline-none p-4.5 text-xs font-mono text-slate-700 placeholder-slate-400 resize-none leading-relaxed bg-white"
                 spellCheck={false}
               />
@@ -607,7 +687,11 @@ function App() {
         <div className="flex justify-center pt-2 animate-fade-in">
           <button
             onClick={handleConvert}
-            className="group flex items-center gap-2 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold px-12 py-3.5 rounded-2xl transition-all duration-200 shadow-md shadow-purple-500/10 hover:shadow-lg hover:shadow-purple-500/20 hover:-translate-y-0.5 active:scale-95 text-sm"
+            className={`group flex items-center gap-2 text-white font-semibold px-12 py-3.5 rounded-2xl transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 text-sm ${
+              providerMode === 'claude'
+                ? 'bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-500 hover:to-orange-500 shadow-amber-500/20'
+                : 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20'
+            }`}
           >
             <span>Bắt đầu chuyển đổi</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
