@@ -12,6 +12,7 @@ export function convertSessionToCodex(session: ChatGPTSession, priority: number 
   const now = new Date();
   const expiresIn = 864000; // 10 ngày tính bằng giây
   const expiresAt = new Date(now.getTime() + expiresIn * 1000);
+  const plan = session.account?.planType || 'free';
 
   return {
     accessToken: session.accessToken || '',
@@ -21,13 +22,13 @@ export function convertSessionToCodex(session: ChatGPTSession, priority: number 
     expiresIn,
     providerSpecificData: {
       chatgptAccountId: session.account?.id || '',
-      chatgptPlanType: session.account?.planType || 'plus',
+      chatgptPlanType: plan,
     },
     id: generateUUID(),
     provider: 'codex',
     authType: 'oauth',
-    name: session.user?.email || '',
-    email: session.user?.email || '',
+    name: session.user?.email || session.user?.name || 'ChatGPT User',
+    email: session.user?.email || 'chatgpt-user@openai.com',
     priority,
     isActive: true,
     createdAt: now.toISOString(),

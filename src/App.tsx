@@ -78,8 +78,12 @@ function App() {
 
   const runClaudeConversion = useCallback((text: string) => {
     const skMatch = text.match(/sk-ant-[A-Za-z0-9_-]+/i);
-    const sessionKey = skMatch ? skMatch[0] : text.trim();
+    if (!skMatch && !text.includes('sk-ant-')) {
+      setConverterError('Mã Claude Session Key phải bắt đầu bằng sk-ant- (Ví dụ: sk-ant-sid01-..., sk-ant-sid02-...).');
+      return;
+    }
 
+    const sessionKey = skMatch ? skMatch[0] : text.trim();
     const now = new Date();
     const expiresIn = 31536000; // 1 năm
     const expiresAt = new Date(now.getTime() + expiresIn * 1000);
@@ -118,7 +122,7 @@ function App() {
 
     setConverterOutput(JSON.stringify(claudeConnection, null, 2));
     setConverterError('');
-    showToast('⚡ Đã dán & chuyển đổi Claude Session thành công!', 'success');
+    showToast('⚡ Đã chuyển đổi Claude Session Key thành công!', 'success');
   }, [showToast]);
 
   const runChatGPTConversion = useCallback((inputJsonStr: string) => {
@@ -126,14 +130,15 @@ function App() {
       const session: ChatGPTSession = JSON.parse(inputJsonStr);
 
       if (!session.accessToken) {
-        setConverterError('Không tìm thấy mã khóa "accessToken" trong dữ liệu JSON ChatGPT.');
+        setConverterError('Không tìm thấy mã "accessToken" trong dữ liệu JSON ChatGPT. Vui lòng kiểm tra lại.');
         return;
       }
 
       const name = session.user?.name || session.user?.email || 'Người dùng ChatGPT';
       const email = session.user?.email || 'chatgpt-user@openai.com';
       const avatar = session.user?.picture || '';
-      const plan = session.account?.planType || 'plus';
+      // Lấy chính xác gói từ JSON (Free, Plus, Team, Pro), mặc định là Free nếu không có
+      const plan = session.account?.planType || 'free';
       const expires = session.expires || '';
 
       setParsedProfile({ provider: 'codex', name, email, avatar, plan, expires });
@@ -141,9 +146,9 @@ function App() {
       const codexConnection = convertSessionToCodex(session, 1);
       setConverterOutput(JSON.stringify(codexConnection, null, 2));
       setConverterError('');
-      showToast('⚡ Đã dán & chuyển đổi ChatGPT Session thành công!', 'success');
+      showToast(`⚡ Đã chuyển đổi ChatGPT Session (${plan.toUpperCase()}) thành công!`, 'success');
     } catch {
-      setConverterError('Định dạng JSON ChatGPT không hợp lệ. Vui lòng dán cấu trúc JSON Auth Session từ ChatGPT.');
+      setConverterError('Định dạng JSON ChatGPT không hợp lệ. Vui lòng copy chính xác dữ liệu từ chatgpt.com/api/auth/session.');
     }
   }, [showToast]);
 
@@ -169,55 +174,57 @@ function App() {
     }
   }, [sessionInput, providerMode, runClaudeConversion, runChatGPTConversion]);
 
-  // Nút 1-Click Clipboard Theo Tab (Chuẩn hóa 100% providerMode)
+  // Nút 1-Click Clipboard Đọc Thực Tế (Không tự tạo fake token)
   const handleOneClickPasteAndConvert = useCallback(async () => {
+    setConverterError('');
+    setConverterOutput('');
+    setParsedProfile(null);
+
     let text = '';
     try {
       text = await navigator.clipboard.readText();
-    } catch {}
+    } catch {
+      showToast('Không thể đọc Clipboard. Vui lòng dán thủ công mã vào ô bên dưới.', 'error');
+      return;
+    }
+
+    text = text ? text.trim() : '';
+
+    if (!text) {
+      showToast(
+        providerMode === 'claude'
+          ? 'Clipboard đang trống! Vui lòng copy mã sessionKey (sk-ant-sid...) từ claude.ai rồi bấm lại nút này.'
+          : 'Clipboard đang trống! Vui lòng copy JSON session từ chatgpt.com/api/auth/session rồi bấm lại nút này.',
+        'info'
+      );
+      return;
+    }
+
+    setSessionInput(text);
 
     if (providerMode === 'claude') {
-      // TAB CLAUDE: Luôn xử lý mẫu/mã Claude
-      if (!text || !text.trim() || !text.includes('sk-ant-')) {
-        text = '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';
+      if (text.includes('sk-ant-')) {
+        runClaudeConversion(text);
+      } else {
+        showToast('Nội dung trong Clipboard không phải mã Claude Session Key (phải bắt đầu bằng sk-ant-).', 'error');
+        setConverterError('Mã trong Clipboard không đúng định dạng Claude Session Key (sk-ant-...).');
       }
-      setSessionInput(text);
-      runClaudeConversion(text);
     } else {
-      // TAB CHATGPT: Luôn xử lý mẫu/mã ChatGPT
-      let isValidChatGPTJson = false;
-      if (text && text.trim()) {
-        try {
-          const parsed = JSON.parse(text);
-          if (parsed.accessToken) {
-            isValidChatGPTJson = true;
-          }
-        } catch {}
+      // Tab ChatGPT
+      try {
+        const session: ChatGPTSession = JSON.parse(text);
+        if (session.accessToken) {
+          runChatGPTConversion(text);
+        } else {
+          showToast('Nội dung JSON trong Clipboard không chứa accessToken ChatGPT.', 'error');
+          setConverterError('Nội dung JSON trong Clipboard không hợp lệ (Thiếu accessToken).');
+        }
+      } catch {
+        showToast('Nội dung Clipboard không phải là JSON Session hợp lệ của ChatGPT.', 'error');
+        setConverterError('Nội dung trong Clipboard không phải là định dạng JSON ChatGPT hợp lệ.');
       }
-
-      if (!isValidChatGPTJson) {
-        // Mẫu ChatGPT Session chuẩn nếu clipboard trống hoặc không phải JSON ChatGPT
-        const sampleChatGPTSession = {
-          user: {
-            id: "user-chatgpt-1click",
-            name: "Tài khoản ChatGPT Plus",
-            email: "chatgpt-user@openai.com",
-            picture: ""
-          },
-          expires: "2026-08-07T15:45:00.000Z",
-          accessToken: "eyJhbGciOiJSUzI1NiIsImtpZCI6Im9wZW5haS1zZXNzaW9uLWtleSJ9.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL3Byb2ZpbGUiOnsiZW1haWwiOiJjaGF0Z3B0LXVzZXJAb3BlbmFpLmNvbSIsIm5hbWUiOiJDaGF0R1BUIFVzZXIifSwiaWF0IjoxNzIzMDAwMDAwLCJleHAiOjE3MjMwODY0MDB9.sample_token_1click",
-          account: {
-            id: "acc-chatgpt-plus",
-            planType: "plus"
-          }
-        };
-        text = JSON.stringify(sampleChatGPTSession, null, 2);
-      }
-
-      setSessionInput(text);
-      runChatGPTConversion(text);
     }
-  }, [providerMode, runClaudeConversion, runChatGPTConversion]);
+  }, [providerMode, runClaudeConversion, runChatGPTConversion, showToast]);
 
   const handleClearConverter = () => {
     setSessionInput('');
@@ -529,7 +536,7 @@ function App() {
           </div>
         </div>
 
-        {/* Nút 1-Click Clipboard Theo Tab */}
+        {/* Nút 1-Click Clipboard Đọc Clipboard Thực Tế */}
         <div className="flex justify-center">
           <button
             onClick={handleOneClickPasteAndConvert}
@@ -538,7 +545,7 @@ function App() {
                 ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600'
                 : 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600'
             }`}
-            title={`Nhấn nút này để dán mã ${providerMode === 'claude' ? 'Claude sessionKey' : 'ChatGPT Session'} và xuất ngay JSON 9Router bên màn hình phải!`}
+            title={`Dán mã ${providerMode === 'claude' ? 'Claude sessionKey' : 'ChatGPT Session'} từ Clipboard để chuyển đổi`}
           >
             <ClipboardCheck className="w-4 h-4" />
             <span>📋 Dán từ Clipboard & Chuyển Đổi {providerMode === 'claude' ? 'Claude' : 'ChatGPT'} (1-Click)</span>
