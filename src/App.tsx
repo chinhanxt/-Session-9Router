@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { 
-  ArrowRight, AlertCircle, RefreshCw, FileJson, Zap, Download, 
-  ExternalLink, Plus, Check, Info, Cpu, Sparkles
+  AlertCircle, RefreshCw, FileJson, Zap, Download, 
+  ExternalLink, Plus, Check, Info, Cpu, Sparkles, ClipboardCheck, Copy
 } from 'lucide-react';
 
 // Import Types
@@ -234,7 +234,7 @@ function App() {
 
     setConverterOutput(JSON.stringify(claudeConnection, null, 2));
     setConverterError('');
-    showToast('⚡ Đã tạo mã kết nối sk-ant-sid02... chuẩn cho 9Router/OmniRoute!', 'success');
+    showToast('⚡ Đã chuyển đổi mã Claude Web thành công!', 'success');
   }, [showToast]);
 
   const runChatGPTConversion = useCallback((inputJsonStr: string) => {
@@ -263,29 +263,42 @@ function App() {
     }
   }, [showToast]);
 
-  const handleConvert = useCallback(() => {
+  // Nút Dán Clipboard & Chuyển Đổi Siêu Tốc
+  const handlePasteAndConvert = useCallback(async () => {
     setConverterError('');
     setConverterOutput('');
     setParsedProfile(null);
 
-    const input = sessionInput.trim();
-    if (!input) {
-      setConverterError(
+    let text = '';
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {
+      showToast('Không thể tự động đọc Clipboard. Vui lòng dán thủ công vào ô bên dưới.', 'error');
+      return;
+    }
+
+    text = text ? text.trim() : '';
+
+    if (!text) {
+      showToast(
         providerMode === 'claude'
-          ? 'Vui lòng dán mã sessionKey hoặc dữ liệu JSON từ https://claude.ai/api/organizations vào ô bên dưới.'
-          : 'Vui lòng dán nội dung JSON Auth Session của ChatGPT vào ô bên dưới.'
+          ? 'Clipboard đang trống! Vui lòng copy dữ liệu từ claude.ai rồi bấm lại nút này.'
+          : 'Clipboard đang trống! Vui lòng copy JSON session từ chatgpt.com/api/auth/session rồi bấm lại nút này.',
+        'info'
       );
       return;
     }
 
-    if (providerMode === 'claude') {
-      runClaudeConversion(input);
-    } else {
-      runChatGPTConversion(input);
-    }
-  }, [sessionInput, providerMode, runClaudeConversion, runChatGPTConversion]);
+    setSessionInput(text);
 
-  // Nút Lấy Session 1-Click duy nhất
+    if (providerMode === 'claude') {
+      runClaudeConversion(text);
+    } else {
+      runChatGPTConversion(text);
+    }
+  }, [providerMode, runClaudeConversion, runChatGPTConversion, showToast]);
+
+  // Nút Lấy Session 1-Click
   const handleAutoFetchSession = useCallback(async () => {
     setConverterError('');
     setConverterOutput('');
@@ -316,12 +329,29 @@ function App() {
     // Nếu chưa có trong bộ nhớ tạm, mở trang API tương ứng trong Tab mới
     if (providerMode === 'claude') {
       window.open('https://claude.ai/api/organizations', '_blank');
-      showToast('Đã mở Claude Organizations API! Hãy copy mã JSON (Ctrl+A Ctrl+C) rồi dán vào ô bên dưới.', 'info');
+      showToast('Đã mở Claude Organizations API! Hãy copy mã JSON (Ctrl+A Ctrl+C) rồi bấm "Dán & Chuyển Đổi".', 'info');
     } else {
       window.open('https://chatgpt.com/api/auth/session', '_blank');
-      showToast('Đã mở ChatGPT Session API! Hãy copy mã JSON (Ctrl+A Ctrl+C) rồi quay lại đây.', 'info');
+      showToast('Đã mở ChatGPT Session API! Hãy copy mã JSON (Ctrl+A Ctrl+C) rồi bấm "Dán & Chuyển Đổi".', 'info');
     }
   }, [providerMode, runClaudeConversion, runChatGPTConversion, showToast]);
+
+  // Nút Sao Chép Riêng Mã accessToken
+  const handleCopyAccessTokenOnly = useCallback(() => {
+    if (!converterOutput) return;
+    try {
+      const parsed = JSON.parse(converterOutput);
+      const token = parsed.accessToken || parsed.providerSpecificData?.sessionKey || '';
+      if (token) {
+        navigator.clipboard.writeText(token);
+        showToast('🎉 Đã copy mã accessToken (sk-ant-sid02...) vào Clipboard!', 'success');
+      } else {
+        showToast('Không tìm thấy mã accessToken trong dữ liệu.', 'error');
+      }
+    } catch {
+      showToast('Không thể sao chép mã accessToken.', 'error');
+    }
+  }, [converterOutput, showToast]);
 
   const handleClearConverter = () => {
     setSessionInput('');
@@ -633,11 +663,12 @@ function App() {
           </div>
         </div>
 
-        {/* NÚT 1-CLICK LẤY SESSION NGẮN GỌN (2-3 CHỮ) */}
-        <div className="flex justify-center">
+        {/* 2 NÚT HÀNH ĐỘNG HÀNG ĐẦU: LẤY SESSION & DÁN & CHUYỂN ĐỔI */}
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {/* Nút 1: Lấy Session */}
           <button
             onClick={handleAutoFetchSession}
-            className={`group text-sm font-extrabold text-white px-9 py-3.5 rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 hover:-translate-y-0.5 active:scale-95 cursor-pointer ${
+            className={`group text-sm font-extrabold text-white px-7 py-3 rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 hover:-translate-y-0.5 active:scale-95 cursor-pointer ${
               providerMode === 'claude'
                 ? 'bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700'
                 : 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600'
@@ -645,6 +676,15 @@ function App() {
           >
             <Sparkles className="w-4.5 h-4.5 animate-pulse" />
             <span>⚡ Lấy Session</span>
+          </button>
+
+          {/* Nút 2: Dán & Chuyển Đổi */}
+          <button
+            onClick={handlePasteAndConvert}
+            className="text-sm font-extrabold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-7 py-3 rounded-2xl shadow-sm transition-all flex items-center gap-2 hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+          >
+            <ClipboardCheck className={`w-4.5 h-4.5 ${providerMode === 'claude' ? 'text-amber-600' : 'text-purple-600'}`} />
+            <span>📋 Dán & Chuyển Đổi</span>
           </button>
         </div>
 
@@ -721,7 +761,19 @@ function App() {
               </div>
 
               {converterOutput && (
-                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto animate-fade-in">
+                <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-auto animate-fade-in">
+                  {/* Nút Sao Chép Riêng Mã accessToken cho Claude */}
+                  {providerMode === 'claude' && (
+                    <button
+                      onClick={handleCopyAccessTokenOnly}
+                      className="text-[10px] text-amber-800 hover:text-amber-950 flex items-center gap-1.5 transition-colors border border-amber-300/80 bg-amber-100/80 hover:bg-amber-200 px-2.5 py-1.5 rounded-xl shadow-sm font-extrabold animate-fade-in"
+                      title="Sao chép riêng chuỗi accessToken (sk-ant-sid02...) vào Clipboard"
+                    >
+                      <Copy className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                      Copy accessToken
+                    </button>
+                  )}
+
                   <button
                     onClick={handleSaveToList}
                     className="text-[10px] text-emerald-750 hover:text-emerald-950 flex items-center gap-1.5 transition-colors border border-emerald-250/60 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-xl shadow-sm font-bold animate-fade-in"
@@ -736,7 +788,7 @@ function App() {
                     title="Tải riêng file sao lưu chỉ cho tài khoản này"
                   >
                     <Download className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                    Tải File Riêng Lẻ
+                    Tải File
                   </button>
                 </div>
               )}
@@ -757,28 +809,13 @@ function App() {
                 <div className="flex flex-col items-center justify-center h-full min-h-[360px] text-slate-400 text-center space-y-2">
                   <FileJson className="w-9 h-9 text-slate-355 stroke-[1.5]" />
                   <p className="text-xs italic font-light max-w-xs px-4 leading-relaxed">
-                    Cấu trúc cấu hình 9Router được tạo mới sẽ tự động hiển thị tại đây sau khi bạn nhấn nút "Bắt đầu chuyển đổi".
+                    Cấu trúc cấu hình 9Router được tạo mới sẽ tự động hiển thị tại đây sau khi bạn nhấn nút "Dán & Chuyển Đổi".
                   </p>
                 </div>
               )}
             </div>
           </div>
 
-        </div>
-
-        {/* Nút Kích Hoạt Chuyển Đổi */}
-        <div className="flex justify-center pt-2 animate-fade-in">
-          <button
-            onClick={handleConvert}
-            className={`group flex items-center gap-2 text-white font-semibold px-12 py-3.5 rounded-2xl transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 text-sm ${
-              providerMode === 'claude'
-                ? 'bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-500 hover:to-orange-500 shadow-amber-500/20'
-                : 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20'
-            }`}
-          >
-            <span>Bắt đầu chuyển đổi</span>
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-          </button>
         </div>
 
         {/* KHU VỰC QUẢN LÝ THƯ VIỆN TÀI KHOẢN */}
