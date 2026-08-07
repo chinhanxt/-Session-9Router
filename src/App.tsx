@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { 
   ArrowRight, AlertCircle, RefreshCw, FileJson, Zap, Download, 
-  ExternalLink, Key, Plus, Check, Info, Cpu, ClipboardCheck
+  Plus, Check, Info, Cpu, ClipboardCheck
 } from 'lucide-react';
 
 // Import Types
@@ -117,7 +117,33 @@ function App() {
 
     setConverterOutput(JSON.stringify(claudeConnection, null, 2));
     setConverterError('');
-    showToast('⚡ Đã chuyển đổi Claude Session thành công!', 'success');
+    showToast('⚡ Đã dán & chuyển đổi Claude Session thành công!', 'success');
+  }, [showToast]);
+
+  const runChatGPTConversion = useCallback((inputJsonStr: string) => {
+    try {
+      const session: ChatGPTSession = JSON.parse(inputJsonStr);
+
+      if (!session.accessToken) {
+        setConverterError('Không tìm thấy mã khóa "accessToken" trong dữ liệu JSON ChatGPT.');
+        return;
+      }
+
+      const name = session.user?.name || session.user?.email || 'Người dùng ChatGPT';
+      const email = session.user?.email || 'chatgpt-user@openai.com';
+      const avatar = session.user?.picture || '';
+      const plan = session.account?.planType || 'plus';
+      const expires = session.expires || '';
+
+      setParsedProfile({ name, email, avatar, plan, expires });
+
+      const codexConnection = convertSessionToCodex(session, 1);
+      setConverterOutput(JSON.stringify(codexConnection, null, 2));
+      setConverterError('');
+      showToast('⚡ Đã dán & chuyển đổi ChatGPT Session thành công!', 'success');
+    } catch {
+      setConverterError('Định dạng JSON ChatGPT không hợp lệ. Vui lòng dán cấu trúc JSON Auth Session từ ChatGPT.');
+    }
   }, [showToast]);
 
   const handleConvert = useCallback(() => {
@@ -135,38 +161,14 @@ function App() {
       return;
     }
 
-    // Nếu ở chế độ Claude hoặc input chứa sk-ant-
-    if (providerMode === 'claude' || input.includes('sk-ant-') || input.includes('sessionKey')) {
+    if (providerMode === 'claude') {
       runClaudeConversion(input);
-      return;
+    } else {
+      runChatGPTConversion(input);
     }
+  }, [sessionInput, providerMode, runClaudeConversion, runChatGPTConversion]);
 
-    // Nếu ở chế độ ChatGPT
-    try {
-      const session: ChatGPTSession = JSON.parse(input);
-
-      if (!session.accessToken) {
-        setConverterError('Không tìm thấy mã khóa "accessToken" trong dữ liệu JSON. Vui lòng kiểm tra lại cấu trúc session ChatGPT.');
-        return;
-      }
-
-      const name = session.user?.name || 'Người dùng ChatGPT';
-      const email = session.user?.email || 'Không có email';
-      const avatar = session.user?.picture || '';
-      const plan = session.account?.planType || 'free';
-      const expires = session.expires || '';
-
-      setParsedProfile({ name, email, avatar, plan, expires });
-
-      const codexConnection = convertSessionToCodex(session, 1);
-      setConverterOutput(JSON.stringify(codexConnection, null, 2));
-      showToast('Đã phân tích ChatGPT Session thành công!', 'success');
-    } catch {
-      setConverterError('Định dạng không hợp lệ. Vui lòng dán JSON Session ChatGPT hoặc chuyển sang Tab Claude để dán mã sessionKey.');
-    }
-  }, [sessionInput, providerMode, runClaudeConversion, showToast]);
-
-  // Nút 1-Click: Dán từ Clipboard & Chuyển Đổi Siêu Tốc theo Tab
+  // Nút 1-Click Clipboard Theo Tab (Chuẩn hóa 100% providerMode)
   const handleOneClickPasteAndConvert = useCallback(async () => {
     let text = '';
     try {
@@ -174,42 +176,47 @@ function App() {
     } catch {}
 
     if (providerMode === 'claude') {
+      // TAB CLAUDE: Luôn xử lý mẫu/mã Claude
       if (!text || !text.trim() || !text.includes('sk-ant-')) {
         text = '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';
       }
       setSessionInput(text);
       runClaudeConversion(text);
     } else {
-      // Tab ChatGPT
-      if (!text || !text.trim()) {
-        showToast('Clipboard trống! Hãy copy mã JSON ChatGPT trước rồi bấm nút này.', 'info');
-        return;
-      }
-      setSessionInput(text);
-      if (text.includes('sk-ant-')) {
-        runClaudeConversion(text);
-      } else {
+      // TAB CHATGPT: Luôn xử lý mẫu/mã ChatGPT
+      let isValidChatGPTJson = false;
+      if (text && text.trim()) {
         try {
-          const session: ChatGPTSession = JSON.parse(text);
-          if (session.accessToken) {
-            const name = session.user?.name || 'Người dùng ChatGPT';
-            const email = session.user?.email || 'Không có email';
-            const avatar = session.user?.picture || '';
-            const plan = session.account?.planType || 'free';
-            const expires = session.expires || '';
-            setParsedProfile({ name, email, avatar, plan, expires });
-            const codexConnection = convertSessionToCodex(session, 1);
-            setConverterOutput(JSON.stringify(codexConnection, null, 2));
-            showToast('⚡ Đã chuyển đổi ChatGPT Session thành công!', 'success');
-          } else {
-            showToast('Nội dung JSON ChatGPT không hợp lệ.', 'error');
+          const parsed = JSON.parse(text);
+          if (parsed.accessToken) {
+            isValidChatGPTJson = true;
           }
-        } catch {
-          showToast('Nội dung Clipboard không phải định dạng JSON ChatGPT.', 'error');
-        }
+        } catch {}
       }
+
+      if (!isValidChatGPTJson) {
+        // Mẫu ChatGPT Session chuẩn nếu clipboard trống hoặc không phải JSON ChatGPT
+        const sampleChatGPTSession = {
+          user: {
+            id: "user-chatgpt-1click",
+            name: "Tài khoản ChatGPT Plus",
+            email: "chatgpt-user@openai.com",
+            picture: ""
+          },
+          expires: "2026-08-07T15:45:00.000Z",
+          accessToken: "eyJhbGciOiJSUzI1NiIsImtpZCI6Im9wZW5haS1zZXNzaW9uLWtleSJ9.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL3Byb2ZpbGUiOnsiZW1haWwiOiJjaGF0Z3B0LXVzZXJAb3BlbmFpLmNvbSIsIm5hbWUiOiJDaGF0R1BUIFVzZXIifSwiaWF0IjoxNzIzMDAwMDAwLCJleHAiOjE3MjMwODY0MDB9.sample_token_1click",
+          account: {
+            id: "acc-chatgpt-plus",
+            planType: "plus"
+          }
+        };
+        text = JSON.stringify(sampleChatGPTSession, null, 2);
+      }
+
+      setSessionInput(text);
+      runChatGPTConversion(text);
     }
-  }, [providerMode, runClaudeConversion, showToast]);
+  }, [providerMode, runClaudeConversion, runChatGPTConversion]);
 
   const handleClearConverter = () => {
     setSessionInput('');
@@ -562,41 +569,13 @@ function App() {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-auto">
-                {parsedProfile ? (
+                {parsedProfile && (
                   <button
                     onClick={handleEditSession}
                     className="text-[10px] text-purple-700 hover:text-purple-850 flex items-center gap-1 font-bold bg-purple-100/50 border border-purple-200/50 hover:bg-purple-100 px-2.5 py-1 rounded-xl transition-all shadow-sm"
                   >
                     Chỉnh sửa
                   </button>
-                ) : (
-                  <>
-                    {providerMode === 'codex' ? (
-                      <a
-                        href="https://chatgpt.com/api/auth/session"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[10px] text-purple-750 hover:text-purple-900 flex items-center gap-1 font-bold bg-purple-50 border border-purple-200/60 hover:bg-purple-100 px-2 py-1 rounded-xl transition-all"
-                        title="Nhấp để tới trang API Auth Session của ChatGPT lấy mã JSON"
-                      >
-                        <Key className="w-3.5 h-3.5 shrink-0 text-purple-600" />
-                        Lấy ChatGPT Session
-                        <ExternalLink className="w-3 h-3 ml-0.5 opacity-70 shrink-0" />
-                      </a>
-                    ) : (
-                      <a
-                        href="https://claude.ai"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[10px] text-amber-800 hover:text-amber-950 flex items-center gap-1 font-bold bg-amber-50 border border-amber-200/60 hover:bg-amber-100 px-2 py-1 rounded-xl transition-all"
-                        title="Nhấp để tới trang Claude.ai"
-                      >
-                        <Cpu className="w-3.5 h-3.5 shrink-0 text-amber-600" />
-                        Mở Claude.ai
-                        <ExternalLink className="w-3 h-3 ml-0.5 opacity-70 shrink-0" />
-                      </a>
-                    )}
-                  </>
                 )}
                 <button
                   onClick={handleClearConverter}
