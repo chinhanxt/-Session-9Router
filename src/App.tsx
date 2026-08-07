@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { 
-  AlertCircle, RefreshCw, FileJson, Zap, Download, 
-  ExternalLink, Plus, Check, Info, Cpu, Sparkles, ClipboardCheck, Copy
+  AlertCircle, RefreshCw, Zap, Download, 
+  ExternalLink, Plus, Check, Info, Cpu, Sparkles, ClipboardCheck, Copy, FileJson
 } from 'lucide-react';
 
 // Import Types
@@ -607,7 +607,7 @@ function App() {
       {/* Vùng Nội Dung Chính */}
       <div className="flex-grow max-w-6xl w-full mx-auto px-4 py-6 sm:py-8 relative z-10 flex flex-col justify-center space-y-6 animate-fade-in">
         
-        {/* HÀNG NÚT ĐẦU TRANG: CHỈ HIỂN THỊ CÁC NÚT (ĐÃ BỎ TEXT TIÊU ĐỀ) */}
+        {/* HÀNG NÚT ĐẦU TRANG: CHỈ HIỂN THỊ CÁC NÚT */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/80 backdrop-blur border border-slate-200/80 p-3 rounded-3xl shadow-sm">
           
           {/* 2 TABS CHÍNH: CHATGPT HOẶC CLAUDE */}
@@ -676,24 +676,11 @@ function App() {
           <div className={`bg-white border rounded-2xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-all duration-300 ${
             providerMode === 'claude' ? 'border-amber-200/80 hover:border-amber-300' : 'border-purple-100/80 hover:border-purple-200/60'
           }`}>
-            {/* Header Bảng Nhập */}
-            <div className={`border-b px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-h-[49px] ${
+            {/* Header Bảng Nhập (Đã Bỏ Dòng Text Tiêu Đề) */}
+            <div className={`border-b px-4.5 py-2 flex items-center justify-end gap-2 min-h-[42px] ${
               providerMode === 'claude' ? 'bg-amber-50/40 border-amber-100/60' : 'bg-purple-50/30 border-purple-100/50'
             }`}>
               <div className="flex items-center gap-2">
-                <FileJson className={`w-4 h-4 shrink-0 ${providerMode === 'claude' ? 'text-amber-600' : 'text-purple-600'}`} />
-                <span className={`text-xs font-bold uppercase tracking-wider whitespace-nowrap ${
-                  providerMode === 'claude' ? 'text-amber-950' : 'text-purple-950'
-                }`}>
-                  {parsedProfile 
-                    ? `Hồ Sơ ${(parsedProfile.provider || providerMode) === 'claude' ? 'Claude' : 'ChatGPT'} Đã Phân Tích` 
-                    : providerMode === 'claude'
-                    ? 'Session Key / Organization JSON (Đầu Vào)'
-                    : 'JSON Session ChatGPT (Đầu Vào)'
-                  }
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-auto">
                 {parsedProfile && (
                   <button
                     onClick={handleEditSession}
@@ -732,22 +719,15 @@ function App() {
 
           {/* Bảng Bên Phải: Kết Quả */}
           <div className="bg-white border border-purple-100/80 rounded-2xl shadow-sm overflow-hidden flex flex-col hover:border-purple-200/60 hover:shadow-md transition-all duration-300">
-            {/* Header Bảng Xuất */}
-            <div className="bg-purple-50/30 border-b border-purple-100/50 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-h-[49px]">
-              <div className="flex items-center gap-2">
-                <FileJson className="w-4 h-4 text-purple-600 shrink-0" />
-                <span className="text-xs font-bold text-purple-950 uppercase tracking-wider whitespace-nowrap">
-                  JSON Kết Nối 9Router (Đầu Ra)
-                </span>
-              </div>
-
+            {/* Header Bảng Xuất (Đã Bỏ Dòng Text Tiêu Đề) */}
+            <div className="bg-purple-50/30 border-b border-purple-100/50 px-4.5 py-2 flex items-center justify-end gap-2 min-h-[42px]">
               {converterOutput && (
-                <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-auto animate-fade-in">
+                <div className="flex flex-wrap items-center gap-2 animate-fade-in">
                   {/* Nút Sao Chép Riêng Mã accessToken cho Claude */}
                   {providerMode === 'claude' && (
                     <button
                       onClick={handleCopyAccessTokenOnly}
-                      className="text-[10px] text-amber-800 hover:text-amber-950 flex items-center gap-1.5 transition-colors border border-amber-300/80 bg-amber-100/80 hover:bg-amber-200 px-2.5 py-1.5 rounded-xl shadow-sm font-extrabold animate-fade-in"
+                      className="text-[10px] text-amber-800 hover:text-amber-950 flex items-center gap-1.5 transition-colors border border-amber-300/80 bg-amber-100/80 hover:bg-amber-200 px-2.5 py-1.5 rounded-xl shadow-sm font-extrabold"
                       title="Sao chép riêng chuỗi accessToken (sk-ant-sid02...) vào Clipboard"
                     >
                       <Copy className="w-3.5 h-3.5 text-amber-700 shrink-0" />
@@ -757,7 +737,7 @@ function App() {
 
                   <button
                     onClick={handleSaveToList}
-                    className="text-[10px] text-emerald-750 hover:text-emerald-950 flex items-center gap-1.5 transition-colors border border-emerald-250/60 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-xl shadow-sm font-bold animate-fade-in"
+                    className="text-[10px] text-emerald-750 hover:text-emerald-950 flex items-center gap-1.5 transition-colors border border-emerald-250/60 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-xl shadow-sm font-bold"
                     title="Lưu tài khoản này vào thư viện để quản lý lâu dài"
                   >
                     <Plus className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -765,7 +745,7 @@ function App() {
                   </button>
                   <button
                     onClick={handleDownloadSingle}
-                    className="text-[10px] text-purple-750 hover:text-purple-950 flex items-center gap-1.5 transition-colors border border-purple-200/60 bg-purple-50 hover:bg-purple-100 px-2.5 py-1.5 rounded-xl shadow-sm font-bold animate-fade-in"
+                    className="text-[10px] text-purple-750 hover:text-purple-950 flex items-center gap-1.5 transition-colors border border-purple-200/60 bg-purple-50 hover:bg-purple-100 px-2.5 py-1.5 rounded-xl shadow-sm font-bold"
                     title="Tải riêng file sao lưu chỉ cho tài khoản này"
                   >
                     <Download className="w-3.5 h-3.5 text-purple-600 shrink-0" />
