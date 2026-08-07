@@ -605,38 +605,19 @@ function App() {
       }`} />
 
       {/* Vùng Nội Dung Chính */}
-      <div className="flex-grow max-w-6xl w-full mx-auto px-4 py-8 sm:py-12 relative z-10 flex flex-col justify-center space-y-8 animate-fade-in">
+      <div className="flex-grow max-w-6xl w-full mx-auto px-4 py-6 sm:py-8 relative z-10 flex flex-col justify-center space-y-6 animate-fade-in">
         
-        {/* Phần Tiêu Đề & 2 Tabs Chính */}
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-3 justify-center">
-            <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shadow-md transition-colors ${
-              providerMode === 'claude' 
-                ? 'bg-amber-100 border-amber-200 shadow-amber-500/10' 
-                : 'bg-purple-100 border-purple-200 shadow-purple-500/5'
-            }`}>
-              {providerMode === 'claude' ? (
-                <Cpu className="w-5 h-5 text-amber-600" />
-              ) : (
-                <Zap className="w-5 h-5 text-purple-600" />
-              )}
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-outfit">
-              Bộ Chuyển Đổi Session 9Router
-            </h1>
-          </div>
-          <p className="text-slate-500 text-sm max-w-xl mx-auto font-light leading-relaxed">
-            Chuyển đổi <strong className="text-purple-650 font-semibold">ChatGPT Auth Session</strong> & <strong className="text-amber-700 font-semibold">Claude Web Session Key</strong> sang định dạng 9Router tương thích hoàn toàn.
-          </p>
-
+        {/* HÀNG NÚT ĐẦU TRANG: CHỈ HIỂN THỊ CÁC NÚT (ĐÃ BỎ TEXT TIÊU ĐỀ) */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/80 backdrop-blur border border-slate-200/80 p-3 rounded-3xl shadow-sm">
+          
           {/* 2 TABS CHÍNH: CHATGPT HOẶC CLAUDE */}
-          <div className="inline-flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm mt-3">
+          <div className="inline-flex items-center gap-2 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/60">
             <button
               onClick={() => {
                 setProviderMode('codex');
                 handleClearConverter();
               }}
-              className={`text-xs font-bold px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 ${
+              className={`text-xs font-bold px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 ${
                 providerMode === 'codex'
                   ? 'bg-purple-600 text-white shadow-md'
                   : 'text-purple-750 hover:bg-purple-50'
@@ -651,7 +632,7 @@ function App() {
                 setProviderMode('claude');
                 handleClearConverter();
               }}
-              className={`text-xs font-bold px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 ${
+              className={`text-xs font-bold px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 ${
                 providerMode === 'claude'
                   ? 'bg-amber-600 text-white shadow-md'
                   : 'text-amber-800 hover:bg-amber-50'
@@ -661,31 +642,31 @@ function App() {
               🧠 Claude Web
             </button>
           </div>
-        </div>
 
-        {/* 2 NÚT HÀNH ĐỘNG HÀNG ĐẦU: LẤY SESSION & DÁN & CHUYỂN ĐỔI */}
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          {/* Nút 1: Lấy Session */}
-          <button
-            onClick={handleAutoFetchSession}
-            className={`group text-sm font-extrabold text-white px-7 py-3 rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 hover:-translate-y-0.5 active:scale-95 cursor-pointer ${
-              providerMode === 'claude'
-                ? 'bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700'
-                : 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600'
-            }`}
-          >
-            <Sparkles className="w-4.5 h-4.5 animate-pulse" />
-            <span>⚡ Lấy Session</span>
-          </button>
+          {/* 2 NÚT HÀNH ĐỘNG HÀNG ĐẦU: LẤY SESSION & DÁN & CHUYỂN ĐỔI */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Nút 1: Lấy Session */}
+            <button
+              onClick={handleAutoFetchSession}
+              className={`group text-xs font-extrabold text-white px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 hover:-translate-y-0.5 active:scale-95 cursor-pointer ${
+                providerMode === 'claude'
+                  ? 'bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700'
+                  : 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 animate-pulse" />
+              <span>⚡ Lấy Session</span>
+            </button>
 
-          {/* Nút 2: Dán & Chuyển Đổi */}
-          <button
-            onClick={handlePasteAndConvert}
-            className="text-sm font-extrabold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-7 py-3 rounded-2xl shadow-sm transition-all flex items-center gap-2 hover:-translate-y-0.5 active:scale-95 cursor-pointer"
-          >
-            <ClipboardCheck className={`w-4.5 h-4.5 ${providerMode === 'claude' ? 'text-amber-600' : 'text-purple-600'}`} />
-            <span>📋 Dán & Chuyển Đổi</span>
-          </button>
+            {/* Nút 2: Dán & Chuyển Đổi */}
+            <button
+              onClick={handlePasteAndConvert}
+              className="text-xs font-extrabold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-6 py-2.5 rounded-xl shadow-sm transition-all flex items-center gap-2 hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            >
+              <ClipboardCheck className={`w-4 h-4 ${providerMode === 'claude' ? 'text-amber-600' : 'text-purple-600'}`} />
+              <span>📋 Dán & Chuyển Đổi</span>
+            </button>
+          </div>
         </div>
 
         {/* Bố Cục Hai Bảng Cân Đối Đối Xứng */}
